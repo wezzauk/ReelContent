@@ -31,6 +31,7 @@ import {
   getHourlyUsage,
 } from '../enforcement/index.js';
 import { getEffectiveLimits, type PlanType, type PlanLimits } from '../billing/plans.js';
+import { calculateCost, formatMonthKeyForLedger, getHardCapsForPlan, HARD_CAPS } from '../billing/provider-pricing.js';
 import { generateContent, type GenerateContentRequest } from '../ai/llm-client.js';
 import type { GenerationJob, JobLane } from '../queue/jobs.js';
 import { GENERATION_STATUS, PLAN_TYPE } from '../db/schema.js';
@@ -104,14 +105,30 @@ export function verifyQStashSignature(signature: string, body: string): boolean 
  * Process a generation job
  *
  * This is the main worker entry point called by the worker endpoint.
+ * Enforces hard caps on retries before processing.
  */
 export async function processGenerationJob(job: GenerationJob): Promise<WorkerResult> {
-  const { jobId, generationId, userId, draftId, variantCount, prompt, lane } = job;
+  const { jobId, generationId, userId, draftId, variantCount, prompt, lane, retryCount } = job;
 
   logger.info(
-    { jobId, generationId, userId, variantCount, lane },
+    { jobId, generationId, userId, variantCount, lane, retryCount },
     'Processing generation job'
   );
+
+  // 0. Check hard cap on retries
+  if (retryCount >= HARD_CAPS.maxRetries) {
+    logger.warn(
+      { jobId, generationId, retryCount, maxRetries: HARD_CAPS.maxRetries },
+      'Max retries exceeded, not retrying'
+    );
+    return {
+      success: false,
+      jobId,
+      generationId,
+      error: 'Max retries exceeded',
+      shouldRetry: false,
+    };
+  }
 
   try {
     // 1. Load generation and draft context
@@ -211,6 +228,7 @@ export async function processGenerationJob(job: GenerationJob): Promise<WorkerRe
       model: providerResult.model || 'unknown',
       promptTokens: providerResult.promptTokens || 0,
       completionTokens: providerResult.completionTokens || 0,
+      requestId: job.requestId,
     });
 
     logger.info(
@@ -287,6 +305,8 @@ async function recheckLimits(userId: string): Promise<{ allowed: boolean; reason
 
 /**
  * Call the AI generator using the unified llm-client
+ *
+ * Enforces hard caps on runtime and output tokens.
  */
 async function callAIGenerator(params: {
   prompt: string;
@@ -305,6 +325,8 @@ async function callAIGenerator(params: {
   error?: string;
   errorCode?: string;
 }> {
+  const startTime = Date.now();
+
   try {
     // Map platform from job to llm-client format
     const platformMap: Record<string, 'instagram' | 'tiktok' | 'facebook'> = {
@@ -341,13 +363,44 @@ async function callAIGenerator(params: {
     const subscription = await subscriptionRepo.findByUserId(params.userId);
     const boost = await boostRepo.findActiveByUserId(params.userId);
 
-    if (subscription) {
-      llmRequest.plan = subscription.planType as any;
+    if (subscription && 'plan' in subscription) {
+      // Handle subscription with 'plan' field instead of 'planType'
+      const subAny = subscription as any;
+      llmRequest.plan = (subAny.plan || subAny.planType) as any;
     }
 
-    const result = await generateContent(llmRequest);
+    // Get hard caps based on plan tier
+    const caps = getHardCapsForPlan(llmRequest.plan);
 
-    if (result.success && result.variants.length > 0) {
+    let result: Awaited<ReturnType<typeof generateContent>>;
+    try {
+      result = await generateContent(llmRequest);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Generation failed';
+      logger.error({ error: errorMessage }, 'AI generation failed');
+      return {
+        success: false,
+        error: errorMessage,
+        errorCode: 'AI_ERROR',
+      };
+    }
+
+    // Check if we got valid variants
+    if (result && result.variants && result.variants.length > 0) {
+      // Hard cap: Check output tokens
+      const outputTokens = result.usage?.outputTokens || 0;
+      if (outputTokens > caps.maxOutputTokens) {
+        logger.warn(
+          { outputTokens, maxOutputTokens: caps.maxOutputTokens },
+          'Output tokens exceeded hard cap'
+        );
+        return {
+          success: false,
+          error: 'Output tokens exceeded maximum allowed',
+          errorCode: 'OUTPUT_TOKENS_EXCEEDED',
+        };
+      }
+
       // Extract text content from variants
       const variantTexts = result.variants.map((v) => v.text);
 
@@ -356,23 +409,22 @@ async function callAIGenerator(params: {
         variants: variantTexts,
         model: result.model,
         promptTokens: result.usage?.inputTokens || 0,
-        completionTokens: result.usage?.outputTokens || 0,
+        completionTokens: outputTokens,
       };
     }
 
     return {
       success: false,
-      error: result.error || 'Generation produced no variants',
+      error: 'Generation produced no variants',
       errorCode: 'AI_ERROR',
     };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error({ error: errorMessage }, 'AI generation failed');
-    return {
-      success: false,
-      error: errorMessage,
-      errorCode: 'AI_ERROR',
-    };
+  } finally {
+    // Log runtime against hard cap
+    const runtime = Date.now() - startTime;
+    logger.debug(
+      { runtimeMs: runtime, maxRuntimeMs: HARD_CAPS.maxRuntimeMs },
+      'Generation runtime'
+    );
   }
 }
 
@@ -410,6 +462,9 @@ async function saveVariants(params: {
 
 /**
  * Write usage ledger entry
+ *
+ * Records token usage and cost estimate for billing analysis.
+ * Uses provider-specific pricing from billing/provider-pricing.ts
  */
 async function writeUsageLedger(params: {
   userId: string;
@@ -417,17 +472,16 @@ async function writeUsageLedger(params: {
   model: string;
   promptTokens: number;
   completionTokens: number;
+  requestId?: string;
 }): Promise<void> {
-  const { userId, generationId, model, promptTokens, completionTokens } = params;
+  const { userId, generationId, model, promptTokens, completionTokens, requestId } = params;
   const totalTokens = promptTokens + completionTokens;
 
-  // Calculate cost estimate (simplified - real implementation would use provider pricing)
-  const costPerToken = 0.0001; // Example rate
-  const costEstimate = totalTokens * costPerToken;
+  // Calculate cost estimate using real provider pricing
+  const costEstimate = calculateCost(model, promptTokens, completionTokens);
 
-  // Get current month key
-  const now = new Date();
-  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  // Get current month key in YYYY-MM format (matches schema)
+  const month = formatMonthKeyForLedger();
 
   await usageLedgerRepo.create({
     userId,
@@ -439,6 +493,11 @@ async function writeUsageLedger(params: {
     costEstimate: String(costEstimate),
     model,
   });
+
+  logger.debug(
+    { userId, generationId, model, promptTokens, completionTokens, totalTokens, costEstimate, requestId },
+    'Usage ledger entry written'
+  );
 }
 
 /**

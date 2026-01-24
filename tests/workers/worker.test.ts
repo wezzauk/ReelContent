@@ -95,6 +95,23 @@ vi.mock('../../lib/billing/plans.js', () => ({
   }),
 }));
 
+vi.mock('../../lib/billing/provider-pricing.js', () => ({
+  calculateCost: vi.fn().mockReturnValue(0.001),
+  formatMonthKeyForLedger: vi.fn().mockReturnValue('2025-01'),
+  getHardCapsForPlan: vi.fn().mockReturnValue({
+    maxOutputTokens: 2000,
+    maxRuntimeMs: 60000,
+    maxRetries: 3,
+    maxVariants: 5,
+  }),
+  HARD_CAPS: {
+    maxOutputTokens: 2000,
+    maxRuntimeMs: 60000,
+    maxRetries: 3,
+    maxVariants: 5,
+  },
+}));
+
 vi.mock('../../lib/redis/client.js', () => ({
   redis: {
     ping: vi.fn().mockResolvedValue('PONG'),
@@ -136,6 +153,7 @@ describe('workers/worker', () => {
       isRegen: false,
       createdAt: new Date().toISOString(),
       requestId: 'req-123',
+      retryCount: 0,
     };
 
     beforeEach(() => {
@@ -200,12 +218,11 @@ describe('workers/worker', () => {
 
       // Mock the llm-client generateContent function
       mockGenerateContent.mockResolvedValue({
-        success: true,
         variants: [
           { text: 'Generated content', hashtags: [], metadata: { hook: 'Hook', benefit: 'Benefit', cta: 'CTA' } }
         ],
         provider: 'openai',
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         usage: { inputTokens: 100, outputTokens: 200, totalTokens: 300 },
       });
 
@@ -269,6 +286,21 @@ describe('workers/worker', () => {
 
       expect(result.success).toBe(false);
       expect(result.shouldRetry).toBe(true); // Database error is transient
+    });
+
+    it('should reject jobs that exceed max retries', async () => {
+      const maxRetriedJob = {
+        ...baseJob,
+        retryCount: 3, // At the hard cap of 3
+      };
+
+      const result = await processGenerationJob(maxRetriedJob);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Max retries exceeded');
+      expect(result.shouldRetry).toBe(false);
+      // Should not try to process the job
+      expect(mockGenerateContent).not.toHaveBeenCalled();
     });
   });
 

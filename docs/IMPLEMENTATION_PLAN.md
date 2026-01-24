@@ -409,9 +409,9 @@ OpenAI client wrapper with Anthropic fallback:
 
 ### Checklist
 
-- [ ] Write usage ledger on completion:
+- [x] Write usage ledger on completion:
   - prompt tokens, completion tokens, model, cost estimate
-- [ ] Implement hard caps:
+- [x] Implement hard caps:
   - Max output tokens
   - Max runtime per job
   - Max retries
@@ -487,8 +487,8 @@ OpenAI client wrapper with Anthropic fallback:
 - [x] Pro Boost add-on enforced (effective plan override)
 - [x] Hourly burst caps + concurrency semaphores active
 - [x] Idempotency works for create/regen/save
-- [ ] Worker retries bounded and safe
-- [ ] No secrets or raw prompts in logs
+- [x] Worker retries bounded and safe
+- [x] No secrets or raw prompts in logs
 - [x] Unit tests for enforcement + billing + validation
-- [ ] Basic tracing: `request_id` → `generation_id`
+- [x] Basic tracing: `request_id` → `generation_id`
 - [ ] Deployed to Vercel + Cloud Run with smoke tests passing

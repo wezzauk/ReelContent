@@ -85,6 +85,8 @@ export interface GenerationJob {
   createdAt: string;
   /** Request ID for tracing */
   requestId: string;
+  /** Retry count for this job (for max retries enforcement) */
+  retryCount: number;
   /** Lease IDs to release on completion */
   userLeaseId?: string;
   providerLeaseId?: string;
@@ -107,6 +109,7 @@ export function createGenerationJob(params: {
   regenChanges?: string;
   userLeaseId?: string;
   providerLeaseId?: string;
+  retryCount?: number;
 }): GenerationJob {
   const requestId = getRequestId();
   return {
@@ -125,6 +128,7 @@ export function createGenerationJob(params: {
     regenChanges: params.regenChanges,
     createdAt: new Date().toISOString(),
     requestId,
+    retryCount: params.retryCount ?? 0,
     userLeaseId: params.userLeaseId,
     providerLeaseId: params.providerLeaseId,
   };
