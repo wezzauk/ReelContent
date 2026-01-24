@@ -6,6 +6,7 @@
  */
 
 import { config } from '../utils/config.js';
+import { recordJobEnqueued } from '../observability/index.js';
 import type { GenerationJob, JobLane } from './jobs.js';
 
 /**
@@ -84,6 +85,10 @@ export async function enqueueGenerationJob(
     }
 
     const result = await response.json();
+
+    // Record job enqueued for latency tracking
+    recordJobEnqueued(job);
+
     return result.messageId;
   } catch (error) {
     throw new Error(`Failed to enqueue generation job: ${error}`);

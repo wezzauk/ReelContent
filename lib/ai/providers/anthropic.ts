@@ -17,6 +17,7 @@ import {
   Platform,
   ActionType,
 } from "../llm-client";
+import { trackProvider429, trackProviderSuccess } from "../../observability/index.js";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -261,9 +262,17 @@ async function callWithRetry<T>(fn: () => Promise<T>): Promise<T> {
   while (attempt < maxAttempts) {
     attempt += 1;
     try {
-      return await fn();
+      const result = await fn();
+      trackProviderSuccess("anthropic");
+      return result;
     } catch (err: any) {
       lastErr = err;
+
+      // Track 429 errors for observability
+      const status = err?.status ?? err?.response?.status;
+      if (status === 429) {
+        trackProvider429("anthropic");
+      }
 
       if (!isRetryable(err) || attempt === maxAttempts) break;
 

@@ -15,6 +15,16 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../utils/config.js';
 import { createLogger } from '../observability/logger.js';
 import {
+  recordJobEnqueued,
+  recordJobStarted,
+  recordJobCompleted,
+  trackProvider429,
+  trackProviderSuccess,
+  logLifecycleEvent,
+  LIFECYCLE_EVENTS,
+  setRequestId,
+} from '../observability/index.js';
+import {
   generationRepo,
   draftRepo,
   variantRepo,
@@ -108,15 +118,35 @@ export function verifyQStashSignature(signature: string, body: string): boolean 
  * Enforces hard caps on retries before processing.
  */
 export async function processGenerationJob(job: GenerationJob): Promise<WorkerResult> {
-  const { jobId, generationId, userId, draftId, variantCount, prompt, lane, retryCount } = job;
+  const { jobId, generationId, userId, draftId, variantCount, prompt, lane, retryCount, requestId } = job;
+
+  // Set request context for logging
+  setRequestId(requestId);
+
+  // Log job received with lifecycle tracking
+  logLifecycleEvent(LIFECYCLE_EVENTS.STARTED, generationId, requestId, {
+    jobId,
+    userId,
+    draftId,
+    variantCount,
+    lane,
+    retryCount,
+  });
+
+  // Record latency: job started
+  recordJobStarted(jobId);
 
   logger.info(
-    { jobId, generationId, userId, variantCount, lane, retryCount },
+    { jobId, generationId, userId, variantCount, lane, retryCount, requestId },
     'Processing generation job'
   );
 
   // 0. Check hard cap on retries
   if (retryCount >= HARD_CAPS.maxRetries) {
+    logLifecycleEvent(LIFECYCLE_EVENTS.FAILED, generationId, requestId, {
+      jobId,
+      reason: 'max_retries_exceeded',
+    });
     logger.warn(
       { jobId, generationId, retryCount, maxRetries: HARD_CAPS.maxRetries },
       'Max retries exceeded, not retrying'
@@ -236,6 +266,15 @@ export async function processGenerationJob(job: GenerationJob): Promise<WorkerRe
       'Generation job completed'
     );
 
+    // Record lifecycle: completed
+    logLifecycleEvent(LIFECYCLE_EVENTS.COMPLETED, generationId, requestId, {
+      jobId,
+      variantCount: savedVariants.length,
+    });
+
+    // Record latency: job completed
+    recordJobCompleted(jobId, true);
+
     return {
       success: true,
       jobId,
@@ -255,6 +294,16 @@ export async function processGenerationJob(job: GenerationJob): Promise<WorkerRe
       { jobId, generationId, error: errorMessage },
       'Generation job failed'
     );
+
+    // Record lifecycle: failed
+    logLifecycleEvent(LIFECYCLE_EVENTS.FAILED, generationId, requestId, {
+      jobId,
+      error: errorMessage,
+      shouldRetry,
+    });
+
+    // Record latency: job completed (with failure)
+    recordJobCompleted(jobId, false, errorMessage);
 
     // Mark generation as failed
     await generationRepo.markFailed(generationId, errorMessage);

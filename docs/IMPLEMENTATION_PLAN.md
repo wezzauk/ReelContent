@@ -432,11 +432,11 @@ OpenAI client wrapper with Anthropic fallback:
 
 ### Checklist
 
-- [ ] Add `request_id` middleware for API and worker
-- [ ] Log key lifecycle events (queued/started/completed/failed)
-- [ ] Track limit rejections (monthly/hourly/concurrency)
-- [ ] Track provider 429 rate
-- [ ] Track job latency (enqueue → start → complete)
+- [x] Add `request_id` middleware for API and worker
+- [x] Log key lifecycle events (queued/started/completed/failed)
+- [x] Track limit rejections (monthly/hourly/concurrency)
+- [x] Track provider 429 rate
+- [x] Track job latency (enqueue → start → complete)
 
 ### DoD
 

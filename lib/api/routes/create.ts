@@ -37,15 +37,24 @@ import {
   getOrSetIdempotency,
 } from '../../enforcement/index.js';
 import { getEffectiveLimits } from '../../billing/plans.js';
-import { enqueueWithRetry, JOB_LANE } from '../../queue/index.js';
-import { logger } from '../../observability/logger.js';
-import { getRequestId } from '../../observability/request-id.js';
+import { enqueueWithRetry, JOB_LANE, createGenerationJob } from '../../queue/index.js';
+import { logger, getRequestId, setRequestId, trackLimitRejection, LIMIT_REJECTION_TYPES, logLifecycleEvent, LIFECYCLE_EVENTS } from '../../observability/index.js';
+
+/**
+ * Extract or generate request ID from request headers
+ */
+function getRequestIdFromRequest(request: Request): string {
+  const headerId = request.headers.get('x-request-id');
+  if (headerId) return headerId;
+  return randomUUID();
+}
 
 /**
  * Handle POST /v1/create
  */
 export async function handleCreate(request: Request): Promise<Response> {
-  const requestId = getRequestId();
+  const requestId = getRequestIdFromRequest(request);
+  setRequestId(requestId);
   const log = logger.child({ requestId, handler: 'create' });
 
   try {
@@ -90,6 +99,10 @@ export async function handleCreate(request: Request): Promise<Response> {
     // 5. Enforce monthly pool
     const monthlyResult = await enforceMonthlyPool(user.userId, limits.gensPerMonth);
     if (!monthlyResult.success) {
+      trackLimitRejection(LIMIT_REJECTION_TYPES.MONTHLY_LIMIT, user.userId, {
+        limit: limits.gensPerMonth,
+        remaining: monthlyResult.remaining,
+      });
       log.warn({ used: limits.gensPerMonth - (monthlyResult.remaining ?? 0) }, 'Monthly limit exceeded');
       throw new ApiError(
         ERROR_CODES.QUOTA_EXCEEDED,
@@ -101,6 +114,9 @@ export async function handleCreate(request: Request): Promise<Response> {
     // 6. Enforce hourly burst
     const burstResult = await enforceHourlyBurst(user.userId);
     if (!burstResult.success) {
+      trackLimitRejection(LIMIT_REJECTION_TYPES.HOURLY_LIMIT, user.userId, {
+        remaining: burstResult.remaining,
+      });
       log.warn({}, 'Hourly burst limit exceeded');
       throw new ApiError(
         ERROR_CODES.RATE_LIMITED,
@@ -116,6 +132,9 @@ export async function handleCreate(request: Request): Promise<Response> {
       limits.userConcurrency
     );
     if (!userLease.acquired) {
+      trackLimitRejection(LIMIT_REJECTION_TYPES.CONCURRENCY_LIMIT, user.userId, {
+        concurrency: limits.userConcurrency,
+      });
       log.warn({ concurrency: limits.userConcurrency }, 'User concurrency limit exceeded');
       throw new ApiError(
         ERROR_CODES.CONCURRENCY_LIMIT,
@@ -135,6 +154,11 @@ export async function handleCreate(request: Request): Promise<Response> {
     if (!providerLease.acquired) {
       // Release user lease on failure
       await releaseUserLease(user.userId, userLease.leaseId!);
+      trackLimitRejection(LIMIT_REJECTION_TYPES.PROVIDER_CONCURRENCY, user.userId, {
+        provider: 'minimax',
+        model: 'video',
+        lane: JOB_LANE.INTERACTIVE,
+      });
       throw new ApiError(
         ERROR_CODES.CONCURRENCY_LIMIT,
         'AI provider is busy. Please try again in a moment.',
@@ -177,7 +201,7 @@ export async function handleCreate(request: Request): Promise<Response> {
       }
 
       // 12. Enqueue generation job
-      const { enqueueWithRetry: enqueue, createGenerationJob, JOB_LANE: LANE } = await import('../../queue/index.js');
+      const { enqueueWithRetry: enqueue, JOB_LANE: LANE } = await import('../../queue/index.js');
       const job = createGenerationJob({
         userId: user.userId,
         draftId: draft.id,
@@ -191,6 +215,14 @@ export async function handleCreate(request: Request): Promise<Response> {
         providerLeaseId: providerLease.leaseId,
       });
       await enqueue(job);
+
+      // Log lifecycle event for tracking
+      logLifecycleEvent(LIFECYCLE_EVENTS.QUEUED, generation.id, requestId, {
+        userId: user.userId,
+        draftId: draft.id,
+        variantCount: body.variantCount ?? 1,
+        platform: body.platform,
+      });
 
       log.info({ generationId: generation.id }, 'Job enqueued');
 
