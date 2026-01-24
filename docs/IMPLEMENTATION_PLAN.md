@@ -342,26 +342,27 @@ Upstash QStash job delivery to a worker endpoint
 
 ### Checklist
 
-- [ ] Define job payload types in `jobs.ts`
-- [ ] Implement `queue/enqueue.ts` with retries/backoff
-- [ ] Worker endpoint `POST /worker/generate`:
-  - Verify QStash signature
-  - Load generation + draft context
-  - Re-check semaphores / budgets (quick)
-  - Call Minimax pipeline
-  - Persist variants
-  - Update generation status
-  - Write usage ledger
-  - Release leases in `finally`
-- [ ] Implement retry policy:
-  - Retry transient errors (429, 5xx) with jitter
-  - Fail fast on validation/permanent errors
+- [x] Define job payload types in `jobs.ts`
+- [x] Implement `queue/enqueue.ts` with retries/backoff
+- [x] Worker endpoint `POST /worker/generate`:
+  - [x] Verify QStash signature
+  - [x] Load generation + draft context
+  - [x] Re-check semaphores / budgets (quick)
+  - [x] Call LLM generation pipeline
+      (OpenAI primary, Anthropic optional fallback; provider mocked in tests)
+  - [x] Persist variants
+  - [x] Update generation status
+  - [x] Write usage ledger
+  - [x] Release leases in `finally`
+- [x] Implement retry policy:
+  - [x] Retry transient errors (429, 5xx) with jitter
+  - [x] Fail fast on validation/permanent errors
 
 ### Tests
 
-- [ ] Worker happy path with provider mocked
-- [ ] Worker releases leases on error
-- [ ] Retries do not duplicate side effects (idempotent updates)
+- [x] Worker happy path with provider mocked
+- [x] Worker releases leases on error
+- [x] Retries do not duplicate side effects (idempotent updates)
 
 ### DoD
 
@@ -373,7 +374,7 @@ Upstash QStash job delivery to a worker endpoint
 
 ### Deliverables
 
-Minimax client wrapper with:
+OpenAI client wrapper with Anthropic fallback:
 
 - Timeouts
 - Retries
@@ -383,16 +384,18 @@ Minimax client wrapper with:
 
 ### Checklist
 
-- [ ] Implement `ai/minimax-client.ts`
-- [ ] Implement `ai/generation.ts`
-- [ ] Implement `ai/guardrails.ts` (max tokens, output length bounds)
-- [ ] Capture token usage and store in `usage_ledger`
-- [ ] Ensure provider keys never logged
+- [x] Implement `ai/providers/openai.ts` (with structured outputs, Zod validation)
+- [x] Implement `ai/providers/anthropic.ts` (fallback with JSON parsing)
+- [x] Implement `ai/llm-client.ts` (unified router with plan-based routing)
+- [x] Update worker to use llm-client
+- [x] Capture token usage and store in `usage_ledger`
+- [x] Ensure provider keys never logged
 
 ### DoD
 
 - All provider calls go through one client
 - Token usage consistently captured
+- Worker uses real LLM clients (not mocks)
 
 ---
 

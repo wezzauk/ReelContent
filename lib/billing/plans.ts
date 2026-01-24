@@ -7,6 +7,14 @@
 
 import { PLAN_TYPE, type PlanType } from '../db/schema.js';
 
+// Re-export PlanType for convenience
+export type { PlanType } from '../db/schema.js';
+
+/**
+ * Provider concurrency limit (per lane)
+ */
+export const PROVIDER_CONCURRENCY_LIMIT = 10;
+
 /**
  * Plan limits as defined in the spec (M2)
  */

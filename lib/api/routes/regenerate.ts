@@ -41,7 +41,7 @@ import {
   getOrSetIdempotency,
 } from '../../enforcement/index.js';
 import { getEffectiveLimits, PLANS } from '../../billing/plans.js';
-import { enqueueWithRetry, JOB_LANE } from '../../queue/enqueue.js';
+import { enqueueWithRetry, JOB_LANE } from '../../queue/index.js';
 import { logger } from '../../observability/logger.js';
 import { getRequestId } from '../../observability/request-id.js';
 import { PLAN_TYPE } from '../../db/schema.js';
@@ -223,14 +223,12 @@ export async function handleRegenerate(request: Request): Promise<Response> {
       }
 
       // 15. Enqueue regeneration job
-      const { enqueueGenerationJob } = await import('../../queue/enqueue.js');
-      await enqueueWithRetry({
-        type: 'generation',
-        jobId: getRequestId(),
+      const { enqueueWithRetry: enqueue, createGenerationJob, JOB_LANE: LANE } = await import('../../queue/index.js');
+      const job = createGenerationJob({
         userId: user.userId,
         draftId: draft.id,
         generationId: generation.id,
-        lane: JOB_LANE.INTERACTIVE,
+        lane: LANE.INTERACTIVE,
         variantCount: body.variantCount ?? 1,
         prompt: draft.prompt,
         platform: draft.platform,
@@ -238,8 +236,10 @@ export async function handleRegenerate(request: Request): Promise<Response> {
         parentGenerationId,
         regenType: body.regenType,
         regenChanges: body.changes,
-        createdAt: new Date().toISOString(),
+        userLeaseId: userLease.leaseId,
+        providerLeaseId: providerLease.leaseId,
       });
+      await enqueue(job);
 
       log.info({ generationId: generation.id }, 'Job enqueued');
 

@@ -6,80 +6,17 @@
  */
 
 import { config } from '../utils/config.js';
-import { getRequestId } from '../observability/request-id.js';
+import type { GenerationJob, JobLane } from './jobs.js';
 
 /**
- * Job types supported by the queue
+ * Default retry count for jobs
  */
-export const JOB_TYPE = {
-  GENERATION: 'generation',
-} as const;
-
-export type JobType = (typeof JOB_TYPE)[keyof typeof JOB_TYPE];
+const DEFAULT_RETRIES = 3;
 
 /**
- * Generation job lane types
+ * Default delay between retries in seconds (base for exponential backoff)
  */
-export const JOB_LANE = {
-  INTERACTIVE: 'interactive',
-  BATCH: 'batch',
-} as const;
-
-export type JobLane = (typeof JOB_LANE)[keyof typeof JOB_LANE];
-
-/**
- * Generation job payload
- */
-export interface GenerationJob {
-  type: JobType;
-  jobId: string;
-  userId: string;
-  draftId: string;
-  generationId: string;
-  lane: JobLane;
-  variantCount: number;
-  prompt: string;
-  platform: string;
-  isRegen: boolean;
-  parentGenerationId?: string;
-  regenType?: 'targeted' | 'full';
-  regenChanges?: string;
-  createdAt: string;
-}
-
-/**
- * Create a generation job payload
- */
-export function createGenerationJob(params: {
-  userId: string;
-  draftId: string;
-  generationId: string;
-  lane?: JobLane;
-  variantCount: number;
-  prompt: string;
-  platform: string;
-  isRegen?: boolean;
-  parentGenerationId?: string;
-  regenType?: 'targeted' | 'full';
-  regenChanges?: string;
-}): GenerationJob {
-  return {
-    type: JOB_TYPE.GENERATION,
-    jobId: getRequestId(),
-    userId: params.userId,
-    draftId: params.draftId,
-    generationId: params.generationId,
-    lane: params.lane ?? JOB_LANE.INTERACTIVE,
-    variantCount: params.variantCount,
-    prompt: params.prompt,
-    platform: params.platform,
-    isRegen: params.isRegen ?? false,
-    parentGenerationId: params.parentGenerationId,
-    regenType: params.regenType,
-    regenChanges: params.regenChanges,
-    createdAt: new Date().toISOString(),
-  };
-}
+const BASE_RETRY_DELAY = 5;
 
 /**
  * Enqueue a generation job with QStash
@@ -103,8 +40,9 @@ export async function enqueueGenerationJob(
     throw new Error('QStash configuration is missing');
   }
 
-  // Build QStash API URL
-  const url = `${qstashUrl}/v2/publish/${qstashUrl}`;
+  // Build QStash API URL - publish to the worker endpoint
+  const workerUrl = `${config.APP_URL}/api/worker/generate`;
+  const url = `${qstashUrl}/v2/publish/${encodeURIComponent(workerUrl)}`;
 
   // Build request body
   const body = JSON.stringify(job);
@@ -119,6 +57,8 @@ export async function enqueueGenerationJob(
   // Add retry header if specified
   if (options?.retries !== undefined) {
     headers['Upstash-Retries'] = String(options.retries);
+  } else {
+    headers['Upstash-Retries'] = String(DEFAULT_RETRIES);
   }
 
   // Add delay header if specified
@@ -155,10 +95,53 @@ export async function enqueueGenerationJob(
  */
 export async function enqueueWithRetry(
   job: GenerationJob,
-  maxRetries: number = 3
+  maxRetries: number = DEFAULT_RETRIES
 ): Promise<string> {
   return enqueueGenerationJob(job, {
     retries: maxRetries,
+  });
+}
+
+/**
+ * Enqueue with exponential backoff for retries
+ *
+ * @param job - The generation job payload
+ * @param attempt - Current attempt number (internal use)
+ * @returns QStash message ID
+ */
+export async function enqueueWithBackoff(
+  job: GenerationJob,
+  attempt: number = 0
+): Promise<string> {
+  // Calculate delay with exponential backoff and jitter
+  const baseDelay = BASE_RETRY_DELAY * Math.pow(2, attempt);
+  const jitter = Math.random() * baseDelay;
+  const delay = Math.floor(baseDelay + jitter);
+
+  return enqueueGenerationJob(job, {
+    retries: DEFAULT_RETRIES - attempt,
+    delay,
+  });
+}
+
+/**
+ * Lane-based queue configuration
+ */
+export const LANE_CONFIG: Record<JobLane, { retries: number; timeout: number }> = {
+  interactive: { retries: 3, timeout: 120 },  // More retries, longer timeout
+  batch: { retries: 1, timeout: 300 },         // Fewer retries, very long timeout
+};
+
+/**
+ * Enqueue a job optimized for a specific lane
+ */
+export async function enqueueForLane(
+  job: GenerationJob,
+  lane: JobLane = 'interactive'
+): Promise<string> {
+  const laneConfig = LANE_CONFIG[lane];
+  return enqueueGenerationJob(job, {
+    retries: laneConfig.retries,
   });
 }
 

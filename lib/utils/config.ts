@@ -27,6 +27,10 @@ const envSchema = z.object({
   // Auth
   AUTH_SECRET: z.string().min(32).optional().default(''),
 
+  // AI Providers
+  OPENAI_API_KEY: z.string().optional().default(''),
+  ANTHROPIC_API_KEY: z.string().optional().default(''),
+
   // App
   APP_URL: z.string().url().optional().default('http://localhost:3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

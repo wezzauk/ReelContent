@@ -37,7 +37,7 @@ import {
   getOrSetIdempotency,
 } from '../../enforcement/index.js';
 import { getEffectiveLimits } from '../../billing/plans.js';
-import { enqueueWithRetry, JOB_LANE } from '../../queue/enqueue.js';
+import { enqueueWithRetry, JOB_LANE } from '../../queue/index.js';
 import { logger } from '../../observability/logger.js';
 import { getRequestId } from '../../observability/request-id.js';
 
@@ -177,20 +177,20 @@ export async function handleCreate(request: Request): Promise<Response> {
       }
 
       // 12. Enqueue generation job
-      const { enqueueGenerationJob } = await import('../../queue/enqueue.js');
-      await enqueueWithRetry({
-        type: 'generation',
-        jobId: getRequestId(),
+      const { enqueueWithRetry: enqueue, createGenerationJob, JOB_LANE: LANE } = await import('../../queue/index.js');
+      const job = createGenerationJob({
         userId: user.userId,
         draftId: draft.id,
         generationId: generation.id,
-        lane: JOB_LANE.INTERACTIVE,
+        lane: LANE.INTERACTIVE,
         variantCount: body.variantCount ?? 1,
         prompt: body.prompt,
         platform: body.platform,
         isRegen: false,
-        createdAt: new Date().toISOString(),
+        userLeaseId: userLease.leaseId,
+        providerLeaseId: providerLease.leaseId,
       });
+      await enqueue(job);
 
       log.info({ generationId: generation.id }, 'Job enqueued');
 
