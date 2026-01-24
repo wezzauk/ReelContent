@@ -213,15 +213,15 @@ docs/
 
 ### Checklist
 
-- [ ] Implement Plan types and PlanLimits
-- [ ] Implement `resolveEffectivePlan(basePlan, boostExpiresAt)`
-- [ ] Implement `getEffectiveLimits(userId)` using DB + cache
+- [x] Implement Plan types and PlanLimits
+- [x] Implement `resolveEffectivePlan(basePlan, boostExpiresAt)`
+- [x] Implement `getEffectiveLimits(userId)` using DB + cache
 - [ ] Add admin-only dev route to grant a Pro Boost (for testing)
 
 ### DoD
 
-- One function returns effective limits for any user
-- No plan numbers hardcoded outside `billing/plans.ts`
+- [x] One function returns effective limits for any user
+- [x] No plan numbers hardcoded outside `billing/plans.ts`
 
 ---
 
@@ -261,36 +261,36 @@ Create `redis/keys.ts` with pure functions.
 
 ### Checklist
 
-- [ ] Implement `redis/client.ts`
-- [ ] Implement key builders in `redis/keys.ts`
-- [ ] Implement Lua scripts in `redis/lua/`
-- [ ] Implement wrappers:
-  - `enforceMonthlyPool(userId, n=1)`
-  - `enforceHourlyBurst(userId, n=1)`
-  - `acquireUserConcurrency(userId, leaseId)`
-  - `acquireProviderConcurrency(provider, model, lane, leaseId)`
-  - `releaseConcurrency(leaseId)`
-  - `checkAndSetRegenCooldown(userId, draftId)`
-  - `fullRegenCap(userId)`
-  - `getOrSetIdempotency(scope, key)`
-- [ ] Implement TTL helpers:
-  - Seconds until month end (UTC)
-  - Hour key formatter (UTC)
+- [x] Implement `redis/client.ts`
+- [x] Implement key builders in `redis/keys.ts`
+- [x] Implement Lua scripts in `redis/lua/`
+- [x] Implement wrappers:
+  - [x] `enforceMonthlyPool(userId, n=1)`
+  - [x] `enforceHourlyBurst(userId, n=1)`
+  - [x] `acquireUserConcurrency(userId, leaseId)`
+  - [x] `acquireProviderConcurrency(provider, model, lane, leaseId)`
+  - [x] `releaseConcurrency(leaseId)`
+  - [x] `checkAndSetRegenCooldown(userId, draftId)`
+  - [x] `fullRegenCap(userId)`
+  - [x] `getOrSetIdempotency(scope, key)`
+- [x] Implement TTL helpers:
+  - [x] Seconds until month end (UTC)
+  - [x] Hour key formatter (UTC)
 
 ### Unit Test Checklist
 
-- [ ] Counter increments under limit
-- [ ] Counter rejects over limit
-- [ ] TTL set on first increment
-- [ ] Semaphore respects limit, expires leases
-- [ ] Cooldown blocks until expiry
-- [ ] Idempotency returns same stored result
-- [ ] Effective plan resolution applies Pro Boost
+- [x] Counter increments under limit
+- [x] Counter rejects over limit
+- [x] TTL set on first increment
+- [x] Semaphore respects limit, expires leases
+- [x] Cooldown blocks until expiry
+- [x] Idempotency returns same stored result
+- [x] Effective plan resolution applies Pro Boost
 
 ### DoD
 
-- A single `enforceOrThrow()` can be used by API routes and workers
-- All enforcement is deterministic and tested
+- [x] A single `enforceOrThrow()` can be used by API routes and workers
+- [x] All enforcement is deterministic and tested
 
 ---
 
@@ -480,12 +480,12 @@ Minimax client wrapper with:
 
 ## 15) Release Checklist (v1)
 
-- [ ] Monthly pools enforced (Basic/Standard/Pro)
-- [ ] Pro Boost add-on enforced (effective plan override)
-- [ ] Hourly burst caps + concurrency semaphores active
-- [ ] Idempotency works for create/regen/save
+- [x] Monthly pools enforced (Basic/Standard/Pro)
+- [x] Pro Boost add-on enforced (effective plan override)
+- [x] Hourly burst caps + concurrency semaphores active
+- [x] Idempotency works for create/regen/save
 - [ ] Worker retries bounded and safe
 - [ ] No secrets or raw prompts in logs
-- [ ] Unit tests for enforcement + billing + validation
+- [x] Unit tests for enforcement + billing + validation
 - [ ] Basic tracing: `request_id` → `generation_id`
 - [ ] Deployed to Vercel + Cloud Run with smoke tests passing
