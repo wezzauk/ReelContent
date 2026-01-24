@@ -316,13 +316,13 @@ Create `redis/keys.ts` with pure functions.
 
 ### Tests
 
-- [ ] Validation failures return correct error
-- [ ] Idempotency prevents duplicates
-- [ ] Limits enforced consistently
+- [x] Validation failures return correct error
+- [x] Idempotency prevents duplicates
+- [x] Limits enforced consistently
 
 ### DoD
 
-- API is thin; all logic lives in modules with tests
+- [x] API is thin; all logic lives in modules with tests
 
 ---
 
