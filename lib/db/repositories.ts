@@ -1,1 +1,585 @@
-// Database repositories for data access
+/**
+ * Database repositories for data access layer
+ */
+
+import { eq, desc, asc, and, gte, lte, like, inArray, sql } from 'drizzle-orm';
+import { db, getDb } from './client';
+import {
+  users,
+  subscriptions,
+  boosts,
+  drafts,
+  generations,
+  variants,
+  assets,
+  usageLedger,
+  type User,
+  type NewUser,
+  type Subscription,
+  type NewSubscription,
+  type Boost,
+  type NewBoost,
+  type Draft,
+  type NewDraft,
+  type Generation,
+  type NewGeneration,
+  type Variant,
+  type NewVariant,
+  type Asset,
+  type NewAsset,
+  type UsageLedger,
+  type NewUsageLedger,
+  GENERATION_STATUS,
+  ASSET_STATUS,
+  PLAN_TYPE,
+  type Platform,
+  type GenerationStatus,
+  type AssetStatus,
+} from './schema';
+
+// Type for pagination cursor
+export interface PaginationCursor {
+  id: string;
+  createdAt: Date;
+}
+
+/**
+ * User Repository
+ */
+export class UserRepository {
+  private db = getDb();
+
+  async create(data: NewUser): Promise<User> {
+    const [user] = await this.db.insert(users).values(data).returning();
+    return user;
+  }
+
+  async findById(id: string): Promise<User | null> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
+    return user || null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const [user] = await this.db.select().from(users).where(eq(users.email, email));
+    return user || null;
+  }
+
+  async update(id: string, data: Partial<NewUser>): Promise<User | null> {
+    const [user] = await this.db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user || null;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.db.delete(users).where(eq(users.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+/**
+ * Subscription Repository
+ */
+export class SubscriptionRepository {
+  private db = getDb();
+
+  async create(data: NewSubscription): Promise<Subscription> {
+    const [subscription] = await this.db
+      .insert(subscriptions)
+      .values(data)
+      .returning();
+    return subscription;
+  }
+
+  async findByUserId(userId: string): Promise<Subscription | null> {
+    const [subscription] = await this.db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    return subscription || null;
+  }
+
+  async findByStripeCustomerId(
+    stripeCustomerId: string
+  ): Promise<Subscription | null> {
+    const [subscription] = await this.db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.stripeCustomerId, stripeCustomerId));
+    return subscription || null;
+  }
+
+  async update(
+    id: string,
+    data: Partial<NewSubscription>
+  ): Promise<Subscription | null> {
+    const [subscription] = await this.db
+      .update(subscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return subscription || null;
+  }
+
+  async getEffectivePlan(
+    userId: string
+  ): Promise<{ plan: string; isPro: boolean }> {
+    // Get base subscription
+    const subscription = await this.findByUserId(userId);
+    if (!subscription) {
+      return { plan: PLAN_TYPE.BASIC, isPro: false };
+    }
+
+    // Check for active Pro Boost
+    const [boost] = await this.db
+      .select()
+      .from(boosts)
+      .where(
+        and(
+          eq(boosts.userId, userId),
+          eq(boosts.isActive, true),
+          gte(boosts.expiresAt, new Date())
+        )
+      )
+      .orderBy(desc(boosts.expiresAt))
+      .limit(1);
+
+    const isPro = boost !== undefined || subscription.plan === PLAN_TYPE.PRO;
+    return { plan: isPro ? PLAN_TYPE.PRO : subscription.plan, isPro };
+  }
+}
+
+/**
+ * Boost Repository
+ */
+export class BoostRepository {
+  private db = getDb();
+
+  async create(data: NewBoost): Promise<Boost> {
+    const [boost] = await this.db.insert(boosts).values(data).returning();
+    return boost;
+  }
+
+  async findByUserId(userId: string): Promise<Boost[]> {
+    return this.db
+      .select()
+      .from(boosts)
+      .where(eq(boosts.userId, userId))
+      .orderBy(desc(boosts.createdAt));
+  }
+
+  async findActiveByUserId(userId: string): Promise<Boost | null> {
+    const [boost] = await this.db
+      .select()
+      .from(boosts)
+      .where(
+        and(
+          eq(boosts.userId, userId),
+          eq(boosts.isActive, true),
+          gte(boosts.expiresAt, new Date())
+        )
+      )
+      .orderBy(desc(boosts.expiresAt))
+      .limit(1);
+    return boost || null;
+  }
+
+  async expire(id: string): Promise<Boost | null> {
+    const [boost] = await this.db
+      .update(boosts)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(boosts.id, id))
+      .returning();
+    return boost || null;
+  }
+
+  async getActiveProBoost(userId: string): Promise<Boost | null> {
+    return this.findActiveByUserId(userId);
+  }
+}
+
+/**
+ * Draft Repository
+ */
+export class DraftRepository {
+  private db = getDb();
+
+  async create(data: NewDraft): Promise<Draft> {
+    const [draft] = await this.db.insert(drafts).values(data).returning();
+    return draft;
+  }
+
+  async findById(id: string): Promise<Draft | null> {
+    const [draft] = await this.db.select().from(drafts).where(eq(drafts.id, id));
+    return draft || null;
+  }
+
+  async findByOwnerId(
+    ownerId: string,
+    options?: {
+      archived?: boolean;
+      platform?: Platform;
+      limit?: number;
+      cursor?: PaginationCursor;
+    }
+  ): Promise<Draft[]> {
+    const conditions = [eq(drafts.ownerId, ownerId)];
+
+    if (options?.archived !== undefined) {
+      conditions.push(eq(drafts.isArchived, options.archived));
+    }
+
+    if (options?.platform) {
+      conditions.push(eq(drafts.platform, options.platform));
+    }
+
+    if (options?.cursor) {
+      conditions.push(
+        sql`(${drafts.createdAt}, ${drafts.id}) < (${options.cursor.createdAt}, ${options.cursor.id})`
+      );
+    }
+
+    const query = this.db
+      .select()
+      .from(drafts)
+      .where(and(...conditions))
+      .orderBy(desc(drafts.createdAt), desc(drafts.id))
+      .limit(options?.limit ?? 100);
+
+    return query;
+  }
+
+  async update(
+    id: string,
+    data: Partial<NewDraft>
+  ): Promise<Draft | null> {
+    const [draft] = await this.db
+      .update(drafts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(drafts.id, id))
+      .returning();
+    return draft || null;
+  }
+
+  async selectVariant(draftId: string, variantId: string): Promise<Draft | null> {
+    return this.update(draftId, { selectedVariantId: variantId });
+  }
+
+  async archive(id: string): Promise<Draft | null> {
+    return this.update(id, { isArchived: true });
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.db.delete(drafts).where(eq(drafts.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+/**
+ * Generation Repository
+ */
+export class GenerationRepository {
+  private db = getDb();
+
+  async create(data: NewGeneration): Promise<Generation> {
+    const [generation] = await this.db.insert(generations).values(data).returning();
+    return generation;
+  }
+
+  async findById(id: string): Promise<Generation | null> {
+    const [generation] = await this.db
+      .select()
+      .from(generations)
+      .where(eq(generations.id, id));
+    return generation || null;
+  }
+
+  async findByIdemKey(idempotencyKey: string): Promise<Generation | null> {
+    const [generation] = await this.db
+      .select()
+      .from(generations)
+      .where(eq(generations.idempotencyKey, idempotencyKey));
+    return generation || null;
+  }
+
+  async findByDraftId(draftId: string): Promise<Generation[]> {
+    return this.db
+      .select()
+      .from(generations)
+      .where(eq(generations.draftId, draftId))
+      .orderBy(desc(generations.createdAt));
+  }
+
+  async findByOwnerId(
+    ownerId: string,
+    options?: {
+      status?: GenerationStatus;
+      limit?: number;
+      cursor?: PaginationCursor;
+    }
+  ): Promise<Generation[]> {
+    const conditions = [eq(generations.ownerId, ownerId)];
+
+    if (options?.status) {
+      conditions.push(eq(generations.status, options.status));
+    }
+
+    if (options?.cursor) {
+      conditions.push(
+        sql`(${generations.createdAt}, ${generations.id}) < (${options.cursor.createdAt}, ${options.cursor.id})`
+      );
+    }
+
+    const query = this.db
+      .select()
+      .from(generations)
+      .where(and(...conditions))
+      .orderBy(desc(generations.createdAt), desc(generations.id))
+      .limit(options?.limit ?? 100);
+
+    return query;
+  }
+
+  async updateStatus(
+    id: string,
+    status: (typeof GENERATION_STATUS)[keyof typeof GENERATION_STATUS],
+    additionalData?: Partial<Generation>
+  ): Promise<Generation | null> {
+    const data: Partial<Generation> = {
+      ...additionalData,
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (status === GENERATION_STATUS.COMPLETED) {
+      data.completedAt = new Date();
+    }
+
+    const [generation] = await this.db
+      .update(generations)
+      .set(data)
+      .where(eq(generations.id, id))
+      .returning();
+    return generation || null;
+  }
+
+  async markFailed(id: string, errorMessage: string): Promise<Generation | null> {
+    return this.updateStatus(id, GENERATION_STATUS.FAILED, { errorMessage });
+  }
+}
+
+/**
+ * Variant Repository
+ */
+export class VariantRepository {
+  private db = getDb();
+
+  async create(data: NewVariant): Promise<Variant> {
+    const [variant] = await this.db.insert(variants).values(data).returning();
+    return variant;
+  }
+
+  async createMany(data: NewVariant[]): Promise<Variant[]> {
+    const result = await this.db.insert(variants).values(data).returning();
+    return result;
+  }
+
+  async findById(id: string): Promise<Variant | null> {
+    const [variant] = await this.db.select().from(variants).where(eq(variants.id, id));
+    return variant || null;
+  }
+
+  async findByGenerationId(generationId: string): Promise<Variant[]> {
+    return this.db
+      .select()
+      .from(variants)
+      .where(eq(variants.generationId, generationId))
+      .orderBy(asc(variants.variantIndex));
+  }
+
+  async findByDraftId(draftId: string): Promise<Variant[]> {
+    return this.db
+      .select()
+      .from(variants)
+      .where(eq(variants.draftId, draftId))
+      .orderBy(desc(variants.createdAt));
+  }
+
+  async deleteByGenerationId(generationId: string): Promise<boolean> {
+    const result = await this.db
+      .delete(variants)
+      .where(eq(variants.generationId, generationId));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+/**
+ * Asset Repository
+ */
+export class AssetRepository {
+  private db = getDb();
+
+  async create(data: NewAsset): Promise<Asset> {
+    const [asset] = await this.db.insert(assets).values(data).returning();
+    return asset;
+  }
+
+  async findById(id: string): Promise<Asset | null> {
+    const [asset] = await this.db.select().from(assets).where(eq(assets.id, id));
+    return asset || null;
+  }
+
+  async findByOwnerId(
+    ownerId: string,
+    options?: {
+      status?: AssetStatus;
+      platform?: Platform;
+      tags?: string[];
+      search?: string;
+      limit?: number;
+      cursor?: PaginationCursor;
+    }
+  ): Promise<Asset[]> {
+    const conditions = [eq(assets.ownerId, ownerId)];
+
+    if (options?.status) {
+      conditions.push(eq(assets.status, options.status));
+    }
+
+    if (options?.platform) {
+      conditions.push(eq(assets.platform, options.platform));
+    }
+
+    if (options?.tags && options.tags.length > 0) {
+      conditions.push(sql`${assets.tags} && ${options.tags}`);
+    }
+
+    if (options?.search) {
+      conditions.push(
+        sql`(${assets.title} ILIKE ${`%${options.search}%`} OR ${assets.content} ILIKE ${`%${options.search}%`})`
+      );
+    }
+
+    if (options?.cursor) {
+      conditions.push(
+        sql`(${assets.createdAt}, ${assets.id}) < (${options.cursor.createdAt}, ${options.cursor.id})`
+      );
+    }
+
+    const query = this.db
+      .select()
+      .from(assets)
+      .where(and(...conditions))
+      .orderBy(desc(assets.createdAt), desc(assets.id))
+      .limit(options?.limit ?? 100);
+
+    return query;
+  }
+
+  async update(
+    id: string,
+    data: Partial<NewAsset>
+  ): Promise<Asset | null> {
+    const [asset] = await this.db
+      .update(assets)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(assets.id, id))
+      .returning();
+    return asset || null;
+  }
+
+  async updateStatus(
+    id: string,
+    status: (typeof ASSET_STATUS)[keyof typeof ASSET_STATUS]
+  ): Promise<Asset | null> {
+    return this.update(id, { status });
+  }
+
+  async archive(id: string): Promise<Asset | null> {
+    return this.updateStatus(id, ASSET_STATUS.ARCHIVED);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.db.delete(assets).where(eq(assets.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+/**
+ * Usage Ledger Repository
+ */
+export class UsageLedgerRepository {
+  private db = getDb();
+
+  async create(data: NewUsageLedger): Promise<UsageLedger> {
+    const [record] = await this.db.insert(usageLedger).values(data).returning();
+    return record;
+  }
+
+  async findByUserAndMonth(userId: string, month: string): Promise<UsageLedger[]> {
+    return this.db
+      .select()
+      .from(usageLedger)
+      .where(
+        and(eq(usageLedger.userId, userId), eq(usageLedger.month, month))
+      )
+      .orderBy(desc(usageLedger.createdAt));
+  }
+
+  async getMonthlyTotals(
+    userId: string,
+    month: string
+  ): Promise<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    costEstimate: number;
+    generationCount: number;
+  }> {
+    const result = await this.db
+      .select({
+        promptTokens: sql<number>`COALESCE(SUM(${usageLedger.promptTokens}), 0)`,
+        completionTokens: sql<number>`COALESCE(SUM(${usageLedger.completionTokens}), 0)`,
+        totalTokens: sql<number>`COALESCE(SUM(${usageLedger.totalTokens}), 0)`,
+        costEstimate: sql<number>`COALESCE(SUM(${usageLedger.costEstimate}), 0)`,
+        generationCount: sql<number>`COUNT(DISTINCT ${usageLedger.generationId})`,
+      })
+      .from(usageLedger)
+      .where(
+        and(eq(usageLedger.userId, userId), eq(usageLedger.month, month))
+      );
+
+    return result[0] || {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      costEstimate: 0,
+      generationCount: 0,
+    };
+  }
+
+  async getGenerationCountByUserAndMonth(userId: string, month: string): Promise<number> {
+    const result = await this.db
+      .select({ count: sql<number>`COUNT(DISTINCT ${usageLedger.generationId})` })
+      .from(usageLedger)
+      .where(
+        and(eq(usageLedger.userId, userId), eq(usageLedger.month, month))
+      );
+
+    return result[0]?.count || 0;
+  }
+}
+
+// Export singleton instances for convenience
+export const userRepo = new UserRepository();
+export const subscriptionRepo = new SubscriptionRepository();
+export const boostRepo = new BoostRepository();
+export const draftRepo = new DraftRepository();
+export const generationRepo = new GenerationRepository();
+export const variantRepo = new VariantRepository();
+export const assetRepo = new AssetRepository();
+export const usageLedgerRepo = new UsageLedgerRepository();
