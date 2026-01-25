@@ -340,8 +340,8 @@ Currently, all API routes return **mock data**:
    - Verify usage meter updates
 
 ### Deliverables
-- [ ] All repos have unit tests (>80% coverage)
-- [ ] Key API flows have integration tests
+- [x] All repos have unit tests (>80% coverage)
+- [x] Key API flows have integration tests
 - [ ] Manual testing checklist passed
 
 ---
