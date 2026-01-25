@@ -177,19 +177,19 @@ docs/
 
 ### Checklist
 
-- [ ] Pick migration tool (Prisma, Drizzle, Kysely+SQL)
-- [ ] Define schema for all tables above
-- [ ] Add indexes:
-  - `(owner_id, created_at)` on drafts/assets
-  - `(draft_id)` on generations/variants
-  - `(generation_id)` on variants
-  - `(owner_id, month)` on usage_ledger rollups
-- [ ] Add FK constraints + cascading rules (soft delete where needed)
+- [x] Pick migration tool (Drizzle + Neon)
+- [x] Define schema for all tables above
+- [x] Add indexes:
+  - [x] `(owner_id, created_at)` on drafts/assets
+  - [x] `(draft_id)` on generations/variants
+  - [x] `(generation_id)` on variants
+  - [x] `(owner_id, month)` on usage_ledger rollups
+- [x] Add FK constraints + cascading rules (soft delete where needed)
 
 ### DoD
 
-- Can create a draft + generation + variants in one transaction
-- Library pagination queries are indexed
+- [x] Can create a draft + generation + variants in one transaction
+- [x] Library pagination queries are indexed
 
 ---
 
@@ -216,7 +216,7 @@ docs/
 - [x] Implement Plan types and PlanLimits
 - [x] Implement `resolveEffectivePlan(basePlan, boostExpiresAt)`
 - [x] Implement `getEffectiveLimits(userId)` using DB + cache
-- [ ] Add admin-only dev route to grant a Pro Boost (for testing)
+- [x] Add admin-only dev route to grant a Pro Boost (for testing)
 
 ### DoD
 
@@ -415,7 +415,7 @@ OpenAI client wrapper with Anthropic fallback:
   - Max output tokens
   - Max runtime per job
   - Max retries
-- [ ] Optional: daily rollup cron
+- [x] Optional: daily rollup cron (usage_rollups table + aggregation functions)
 
 ### DoD
 

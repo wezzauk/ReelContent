@@ -24,7 +24,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@neondatabase/serverless": "^0.10.0",
+    "@types/bcryptjs": "^2.4.6",
     "@upstash/redis": "^1.31.0",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^11.0.0",
     "drizzle-orm": "^0.38.0",
     "jose": "^5.9.0",

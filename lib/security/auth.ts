@@ -6,7 +6,7 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { cookies } from 'next/headers';
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+  process.env.AUTH_SECRET || 'your-secret-key-change-in-production'
 );
 
 export interface UserPayload {

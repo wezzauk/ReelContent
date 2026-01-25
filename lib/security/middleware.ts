@@ -65,8 +65,6 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
  * Main security middleware handler
  */
 export async function securityMiddleware(request: NextRequest): Promise<NextResponse> {
-  const { pathname } = request.nextUrl;
-
   // Handle CORS preflight
   if (request.method === 'OPTIONS') {
     const response = new NextResponse(null, { status: 204 });
@@ -93,35 +91,58 @@ export async function securityMiddleware(request: NextRequest): Promise<NextResp
 }
 
 /**
- * Auth guard middleware - protects write endpoints
+ * Auth guard middleware - protects authenticated routes
+ * All /api/* routes require authentication except public endpoints
  */
 export async function authGuard(
   request: NextRequest
 ): Promise<NextResponse | null> {
-  // Skip auth for health check and public routes
+  // Skip auth for truly public routes
   const publicPaths = ['/health', '/api/health', '/api/webhooks'];
   if (publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))) {
     return null;
   }
 
-  // Check Authorization header
-  const authHeader = request.headers.get('Authorization');
-  const user = await getUserFromHeader(authHeader);
+  // All API routes require authentication
+  if (request.nextUrl.pathname.startsWith('/api/')) {
+    const authHeader = request.headers.get('Authorization');
+    const user = await getUserFromHeader(authHeader);
 
-  if (!user) {
-    const response = NextResponse.json(
-      errorResponse(ERROR_CODES.UNAUTHORIZED, 'Authentication required'),
-      { status: 401 }
-    );
-    return applySecurityHeaders(response);
+    if (!user) {
+      const response = NextResponse.json(
+        errorResponse(ERROR_CODES.UNAUTHORIZED, 'Authentication required'),
+        { status: 401 }
+      );
+      return applySecurityHeaders(response);
+    }
+
+    // Attach user to request headers for downstream use
+    const response = NextResponse.next();
+    response.headers.set('X-User-Id', user.userId);
+    response.headers.set('X-User-Plan', user.plan);
+
+    return response;
   }
 
-  // Attach user to request headers for downstream use
-  const response = NextResponse.next();
-  response.headers.set('X-User-Id', user.userId);
-  response.headers.set('X-User-Plan', user.plan);
+  // Dashboard routes also require authentication
+  const protectedPaths = ['/dashboard', '/create', '/review', '/library'];
+  if (protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))) {
+    const authHeader = request.headers.get('Authorization');
+    const user = await getUserFromHeader(authHeader);
 
-  return response;
+    if (!user) {
+      const response = NextResponse.redirect(new URL('/login', request.url));
+      return applySecurityHeaders(response);
+    }
+
+    const response = NextResponse.next();
+    response.headers.set('X-User-Id', user.userId);
+    response.headers.set('X-User-Plan', user.plan);
+
+    return response;
+  }
+
+  return null;
 }
 
 /**

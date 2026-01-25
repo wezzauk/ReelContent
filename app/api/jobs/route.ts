@@ -77,5 +77,11 @@ export async function GET(req: Request) {
   // Trim
   jobs = jobs.slice(0, limit);
 
-  return NextResponse.json(jobs);
+  // userId is available from X-User-Id header (set by middleware)
+  const userId = req.headers.get("X-User-Id");
+
+  return NextResponse.json({
+    jobs,
+    userId, // For debugging - remove in production
+  });
 }

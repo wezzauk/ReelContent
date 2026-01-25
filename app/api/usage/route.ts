@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Usage } from "@/lib/types";
 
-export async function GET() {
+export async function GET(req: Request) {
   const usage: Usage = {
     plan: "starter",
     exportsUsed: 8,
@@ -11,5 +11,11 @@ export async function GET() {
     resetsAt: "2026-02-01T00:00:00Z",
   };
 
-  return NextResponse.json(usage);
+  // userId is available from X-User-Id header (set by middleware)
+  const userId = req.headers.get("X-User-Id");
+
+  return NextResponse.json({
+    ...usage,
+    userId, // For debugging - remove in production
+  });
 }

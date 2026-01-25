@@ -46,5 +46,11 @@ export async function GET(req: Request) {
     a.createdAt < b.createdAt ? 1 : -1
   );
 
-  return NextResponse.json(exportsList.slice(0, limit));
+  // userId is available from X-User-Id header (set by middleware)
+  const userId = req.headers.get("X-User-Id");
+
+  return NextResponse.json({
+    exports: exportsList.slice(0, limit),
+    userId, // For debugging - remove in production
+  });
 }

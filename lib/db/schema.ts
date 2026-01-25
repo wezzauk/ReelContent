@@ -71,6 +71,7 @@ export const users = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull().unique(),
     name: text('name'),
+    hashedPassword: text('hashed_password'),
     avatarUrl: text('avatar_url'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -234,7 +235,7 @@ export const variants = pgTable(
     index('variants_draft_id_idx').on(table.draftId),
     index('variants_owner_id_idx').on(table.ownerId),
     index('variants_owner_created_idx').on(table.ownerId, table.createdAt),
-    primaryKey({ columns: [table.generationId, table.variantIndex] }),
+    index('variants_gen_index_idx').on(table.generationId, table.variantIndex),
   ]
 );
 
@@ -303,6 +304,33 @@ export const usageLedger = pgTable(
     index('usage_ledger_user_month_idx').on(table.userId, table.month),
     index('usage_ledger_generation_idx').on(table.generationId),
     check('usage_ledger_tokens_check', sql`${table.totalTokens} = ${table.promptTokens} + ${table.completionTokens}`),
+  ]
+);
+
+/**
+ * Usage rollups table - daily/monthly aggregated usage
+ * Populated by cron job for faster queries
+ */
+export const usageRollups = pgTable(
+  'usage_rollups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    period: text('period').notNull(), // Format: YYYY-MM-DD (daily) or YYYY-MM (monthly)
+    periodType: text('period_type', { enum: ['daily', 'monthly'] }).notNull(),
+    generationCount: integer('generation_count').notNull().default(0),
+    promptTokens: integer('prompt_tokens').notNull().default(0),
+    completionTokens: integer('completion_tokens').notNull().default(0),
+    totalTokens: integer('total_tokens').notNull().default(0),
+    costEstimate: decimal('cost_estimate', { precision: 10, scale: 6 }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('usage_rollups_user_period_idx').on(table.userId, table.period, table.periodType),
+    check('usage_rollups_tokens_check', sql`${table.totalTokens} = ${table.promptTokens} + ${table.completionTokens}`),
   ]
 );
 
@@ -403,6 +431,13 @@ export const usageLedgerRelations = relations(usageLedger, ({ one }) => ({
   }),
 }));
 
+export const usageRollupsRelations = relations(usageRollups, ({ one }) => ({
+  user: one(users, {
+    fields: [usageRollups.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports for convenience
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -420,3 +455,5 @@ export type Asset = typeof assets.$inferSelect;
 export type NewAsset = typeof assets.$inferInsert;
 export type UsageLedger = typeof usageLedger.$inferSelect;
 export type NewUsageLedger = typeof usageLedger.$inferInsert;
+export type UsageRollup = typeof usageRollups.$inferSelect;
+export type NewUsageRollup = typeof usageRollups.$inferInsert;
