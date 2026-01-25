@@ -252,9 +252,9 @@ Currently, all API routes return **mock data**:
 3. **Redirect to `/review/[id]` after creation**
 
 ### Deliverables
-- [ ] `/create` page with form UI
-- [ ] `POST /v1/create` endpoint fully implemented
-- [ ] User redirected to review page after creation
+- [x] `/create` page with form UI
+- [x] `POST /v1/create` endpoint fully implemented
+- [x] User redirected to review page after creation
 
 ---
 
@@ -286,10 +286,10 @@ Currently, all API routes return **mock data**:
    - Create asset record
 
 ### Deliverables
-- [ ] `/review` page showing all drafts
-- [ ] `GET /v1/generations/:id` implemented
-- [ ] `POST /v1/regenerate` implemented
-- [ ] `POST /v1/library/assets` implemented
+- [x] `/review` page showing all drafts
+- [x] `GET /v1/generations/:id` implemented
+- [x] `POST /v1/regenerate` implemented
+- [x] `POST /v1/library/assets` implemented
 
 ---
 
