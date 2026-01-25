@@ -583,3 +583,181 @@ export const generationRepo = new GenerationRepository();
 export const variantRepo = new VariantRepository();
 export const assetRepo = new AssetRepository();
 export const usageLedgerRepo = new UsageLedgerRepository();
+
+// ============================================================================
+// Dashboard-specific query functions
+// ============================================================================
+
+import { type Job, type JobStatus, type ExportItem, type Usage } from '@/lib/types';
+
+/**
+ * Map generation status to dashboard job status
+ */
+function mapGenerationStatusToJobStatus(
+  status: string | null,
+  progressPct: number | null
+): JobStatus {
+  if (status === 'failed') return 'failed';
+  if (status === 'processing' || status === 'pending') return 'processing';
+  if (status === 'completed') {
+    if (progressPct !== null && progressPct < 100) return 'processing';
+    return 'ready';
+  }
+  return 'processing';
+}
+
+/**
+ * Get recent jobs for the dashboard
+ * Combines draft info with the latest generation status
+ */
+export async function getRecentJobs(userId: string, limit: number = 10): Promise<Job[]> {
+  const db = getDb();
+
+  // Get drafts with their latest generation
+  const results = await db
+    .select({
+      draftId: drafts.id,
+      title: drafts.title,
+      platform: drafts.platform,
+      preset: drafts.settings,
+      genStatus: generations.status,
+      genId: generations.id,
+      updatedAt: drafts.updatedAt,
+    })
+    .from(drafts)
+    .leftJoin(
+      generations,
+      and(
+        eq(drafts.id, generations.draftId),
+        // Subquery to get only the latest generation per draft
+        sql`${generations.id} = (
+          SELECT id FROM ${generations} g2
+          WHERE g2.draft_id = ${drafts.id}
+          ORDER BY g2.created_at DESC
+          LIMIT 1
+        )`
+      )
+    )
+    .where(eq(drafts.ownerId, userId))
+    .orderBy(desc(drafts.updatedAt))
+    .limit(limit);
+
+  return results.map((row) => ({
+    id: row.draftId,
+    title: row.title ?? 'Untitled Draft',
+    platform: mapDbPlatformToFrontend(row.platform),
+    preset: row.preset ?? 'Default',
+    status: mapGenerationStatusToJobStatus(row.genStatus, row.genId ? 50 : 0), // Approximate progress
+    updatedAt: row.updatedAt?.toISOString() ?? new Date().toISOString(),
+  }));
+}
+
+/**
+ * Get recent exports (assets) for the dashboard
+ */
+export async function getRecentExports(
+  userId: string,
+  limit: number = 10
+): Promise<ExportItem[]> {
+  const db = getDb();
+
+  const results = await db
+    .select({
+      id: assets.id,
+      draftId: assets.draftId,
+      title: assets.title,
+      createdAt: assets.createdAt,
+    })
+    .from(assets)
+    .where(
+      and(
+        eq(assets.ownerId, userId),
+        eq(assets.status, ASSET_STATUS.ACTIVE)
+      )
+    )
+    .orderBy(desc(assets.createdAt))
+    .limit(limit);
+
+  return results.map((row) => ({
+    id: row.id,
+    jobId: row.draftId ?? 'unknown',
+    title: row.title ?? 'Untitled Export',
+    format: 'mp4' as const, // Default format
+    createdAt: row.createdAt?.toISOString() ?? new Date().toISOString(),
+  }));
+}
+
+/**
+ * Get user usage statistics for the dashboard
+ */
+export async function getUserUsage(userId: string): Promise<Usage> {
+  const db = getDb();
+
+  // Get current month key
+  const currentMonth = formatMonthKey(new Date());
+
+  // Get usage from ledger
+  const usageResult = await db
+    .select({
+      generationCount: sql<number>`COALESCE(COUNT(DISTINCT ${usageLedger.generationId}), 0)`,
+    })
+    .from(usageLedger)
+    .where(
+      and(
+        eq(usageLedger.userId, userId),
+        eq(usageLedger.month, currentMonth)
+      )
+    );
+
+  const exportsUsed = usageResult[0]?.generationCount ?? 0;
+
+  // Get subscription
+  const subscription = await subscriptionRepo.findByUserId(userId);
+
+  // Get active boost
+  const boost = await boostRepo.findActiveByUserId(userId);
+
+  // Resolve effective plan and limits
+  const effectivePlan = resolveEffectivePlan(
+    (subscription?.plan as PlanType) ?? PLAN_TYPE.BASIC,
+    boost?.expiresAt?.toISOString() ?? null
+  );
+  const limits = PLANS[effectivePlan];
+
+  // Calculate reset date (first of next month)
+  const now = new Date();
+  const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+  return {
+    plan: effectivePlan as 'free' | 'starter' | 'pro',
+    exportsUsed,
+    exportsLimit: limits.gensPerMonth,
+    minutesUsed: 0, // Not tracking minutes directly, using generations count
+    minutesLimit: limits.gensPerMonth, // Using gensPerMonth as proxy for minutes
+    resetsAt: nextMonth.toISOString(),
+  };
+}
+
+// ============================================================================
+// Helper functions
+// ============================================================================
+
+import { type PlanType } from '../db/schema';
+import { PLANS, resolveEffectivePlan } from '../billing/plans';
+import { formatMonthKey } from '../billing/plans';
+
+/**
+ * Map database platform to frontend platform
+ */
+function mapDbPlatformToFrontend(dbPlatform: string | null): 'tiktok' | 'reels' | 'shorts' {
+  switch (dbPlatform) {
+    case 'tiktok':
+      return 'tiktok';
+    case 'instagram_reels':
+      return 'reels';
+    case 'youtube_shorts':
+      return 'shorts';
+    default:
+      return 'reels';
+  }
+}

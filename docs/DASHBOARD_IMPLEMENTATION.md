@@ -78,10 +78,10 @@ Currently, all API routes return **mock data**:
    - `lib/db/repos/usage.ts` - calculate usage from ledger
 
 ### Deliverables
-- [ ] `DATABASE_URL` set in environment
-- [ ] `lib/db/repos/jobs.ts` with `getRecentJobs(userId, limit)`
-- [ ] `lib/db/repos/exports.ts` with `getRecentExports(userId, limit)`
-- [ ] `lib/db/repos/usage.ts` with `getUserUsage(userId)`
+- [x] `DATABASE_URL` set in environment
+- [x] `lib/db/repos/jobs.ts` with `getRecentJobs(userId, limit)`
+- [x] `lib/db/repos/exports.ts` with `getRecentExports(userId, limit)`
+- [x] `lib/db/repos/usage.ts` with `getUserUsage(userId)`
 
 ---
 
@@ -121,8 +121,8 @@ Currently, all API routes return **mock data**:
    - Call `getRecentJobs(ctx.userId, limit)`
 
 ### Deliverables
-- [ ] `lib/db/repos/jobs.ts` implemented
-- [ ]` returns real data `/api/jobs from database
+- [x] `lib/db/repos/jobs.ts` implemented
+- [x] `/api/jobs` returns real data from database
 
 ---
 
@@ -159,8 +159,8 @@ Currently, all API routes return **mock data**:
    - Call `getRecentExports(ctx.userId, limit)`
 
 ### Deliverables
-- [ ] `lib/db/repos/exports.ts` implemented
-- [ ] `/api/exports` returns real data from database
+- [x] `lib/db/repos/exports.ts` implemented
+- [x] `/api/exports` returns real data from database
 
 ---
 
@@ -351,12 +351,10 @@ Currently, all API routes return **mock data**:
 | File | Change |
 |------|--------|
 | `middleware.ts` | Add auth protection |
-| `lib/db/repos/jobs.ts` | New - query drafts/generations |
-| `lib/db/repos/exports.ts` | New - query assets |
-| `lib/db/repos/usage.ts` | New - calculate usage + limits |
-| `app/api/jobs/route.ts` | Wire to repo |
-| `app/api/exports/route.ts` | Wire to repo |
-| `app/api/usage/route.ts` | Wire to repo |
+| `lib/db/repositories.ts` | Add `getRecentJobs`, `getRecentExports`, `getUserUsage` functions |
+| `app/api/jobs/route.ts` | Wire to repository |
+| `app/api/exports/route.ts` | Wire to repository |
+| `app/api/usage/route.ts` | Wire to repository |
 | `app/api/v1/create/route.ts` | Implement create flow |
 | `app/api/v1/regenerate/route.ts` | Implement regen flow |
 | `app/api/v1/library/assets/route.ts` | Implement save to library |
