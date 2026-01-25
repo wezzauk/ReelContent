@@ -9,7 +9,7 @@
  * - Anthropic: https://anthropic.com/pricing
  */
 
-import type { ProviderName } from '../ai/llm-client.js';
+import type { ProviderName } from '../ai/llm-client';
 
 /**
  * Model pricing in USD per 1,000 tokens
@@ -104,7 +104,7 @@ export function calculateCost(
   if (!pricing) {
     // Fallback: use conservative estimate for unknown models
     // This prevents silent failures but may overcharge
-    return (promptTokens + completionTokens) * 0.0005; // $0.50 per 1M tokens
+    return ((promptTokens + completionTokens) / 1_000_000) * 0.50; // $0.50 per 1M tokens
   }
 
   const inputCost = (promptTokens / 1_000_000) * pricing.inputPer1M;
