@@ -228,3 +228,122 @@ export async function handleListAssets(request: Request): Promise<Response> {
     );
   }
 }
+
+/**
+ * Handle DELETE /v1/library/assets/:id
+ * Delete an asset from the library
+ */
+export async function handleDeleteAsset(request: Request, assetId: string): Promise<Response> {
+  const requestId = getRequestId();
+  const log = logger.child({ requestId, handler: 'deleteAsset' });
+
+  try {
+    // 1. Authenticate
+    const user = await getUserFromHeader(request.headers.get('authorization'));
+    if (!user) {
+      throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+    }
+
+    log.info({ userId: user.userId, assetId }, 'Delete asset request');
+
+    // 2. Fetch asset
+    const asset = await assetRepo.findById(assetId);
+    if (!asset) {
+      throw new ApiError(ERROR_CODES.NOT_FOUND, 'Asset not found', 404);
+    }
+
+    // 3. Check ownership
+    if (asset.ownerId !== user.userId) {
+      throw new ApiError(ERROR_CODES.FORBIDDEN, 'Not authorized', 403);
+    }
+
+    // 4. Delete asset
+    await assetRepo.delete(assetId);
+
+    log.info({ assetId }, 'Asset deleted');
+
+    // 5. Return 200 OK
+    return Response.json({
+      success: true,
+      data: { deleted: true },
+    }, {
+      headers: { 'X-Request-ID': requestId },
+    });
+  } catch (error) {
+    log.error({ error }, 'Delete asset failed');
+    return Response.json(
+      {
+        success: false,
+        error: {
+          code: error instanceof ApiError ? error.code : ERROR_CODES.INTERNAL_ERROR,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      {
+        status: error instanceof ApiError ? error.status : 500,
+        headers: { 'X-Request-ID': requestId },
+      }
+    );
+  }
+}
+
+/**
+ * Handle PATCH /v1/library/assets/:id/archive
+ * Archive an asset
+ */
+export async function handleArchiveAsset(request: Request, assetId: string): Promise<Response> {
+  const requestId = getRequestId();
+  const log = logger.child({ requestId, handler: 'archiveAsset' });
+
+  try {
+    // 1. Authenticate
+    const user = await getUserFromHeader(request.headers.get('authorization'));
+    if (!user) {
+      throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
+    }
+
+    log.info({ userId: user.userId, assetId }, 'Archive asset request');
+
+    // 2. Fetch asset
+    const asset = await assetRepo.findById(assetId);
+    if (!asset) {
+      throw new ApiError(ERROR_CODES.NOT_FOUND, 'Asset not found', 404);
+    }
+
+    // 3. Check ownership
+    if (asset.ownerId !== user.userId) {
+      throw new ApiError(ERROR_CODES.FORBIDDEN, 'Not authorized', 403);
+    }
+
+    // 4. Archive asset
+    const updated = await assetRepo.archive(assetId);
+
+    log.info({ assetId }, 'Asset archived');
+
+    // 5. Return 200 OK
+    return Response.json({
+      success: true,
+      data: {
+        id: updated?.id,
+        status: updated?.status,
+      },
+    }, {
+      headers: { 'X-Request-ID': requestId },
+    });
+  } catch (error) {
+    log.error({ error }, 'Archive asset failed');
+    return Response.json(
+      {
+        success: false,
+        error: {
+          code: error instanceof ApiError ? error.code : ERROR_CODES.INTERNAL_ERROR,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        },
+      },
+      {
+        status: error instanceof ApiError ? error.status : 500,
+        headers: { 'X-Request-ID': requestId },
+      }
+    );
+  }
+}

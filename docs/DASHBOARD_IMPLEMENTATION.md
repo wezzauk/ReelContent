@@ -311,8 +311,8 @@ Currently, all API routes return **mock data**:
    - Return assets + `next_cursor`
 
 ### Deliverables
-- [ ] `/library` page with full functionality
-- [ ] `GET /v1/library/assets` implemented with pagination
+- [x] `/library` page with full functionality
+- [x] `GET /v1/library/assets` implemented with pagination
 
 ---
 
