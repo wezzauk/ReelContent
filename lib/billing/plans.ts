@@ -5,10 +5,10 @@
  * effective limits based on base plan and active Pro Boost.
  */
 
-import { PLAN_TYPE, type PlanType } from '../db/schema.js';
+import { PLAN_TYPE, type PlanType } from '../db/schema';
 
 // Re-export PlanType for convenience
-export type { PlanType } from '../db/schema.js';
+export type { PlanType } from '../db/schema';
 
 /**
  * Provider concurrency limit (per lane)

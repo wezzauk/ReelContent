@@ -2,4 +2,4 @@
  * API Schemas barrel export
  */
 
-export * from './requests.js';
+export * from './requests';

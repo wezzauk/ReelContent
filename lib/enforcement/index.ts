@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { redis, type EnforcementResult, type SemaphoreResult, type IdempotencyResult } from '../redis/client.js';
+import { redis, type EnforcementResult, type SemaphoreResult, type IdempotencyResult } from '../redis/client';
 import {
   keys,
   TTL_CONFIG,
@@ -24,14 +24,14 @@ import {
   leaseKey,
   providerConcurrencyKey,
   idempotencyKey,
-} from '../redis/keys.js';
+} from '../redis/keys';
 import {
   secondsUntilMonthEnd,
   secondsUntilHourEnd,
   formatMonthKey,
   formatHourKey,
-} from '../billing/plans.js';
-import { LuaScripts, getScript } from '../redis/lua/loader.js';
+} from '../billing/plans';
+import { LuaScripts, getScript } from '../redis/lua/loader';
 
 /**
  * Default burst limit per hour (applied to all plans)

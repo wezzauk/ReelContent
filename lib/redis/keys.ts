@@ -5,7 +5,7 @@
  * All keys use the 'app:' prefix to avoid collisions.
  */
 
-import { formatMonthKey, formatHourKey } from '../billing/plans.js';
+import { formatMonthKey, formatHourKey } from '../billing/plans';
 
 /**
  * Namespace for all app keys

@@ -2,7 +2,7 @@
  * Observability module exports
  */
 
-export { logger, createLogger, getLogger } from './logger.js';
+export { logger, createLogger, getLogger } from './logger';
 export {
   generateRequestId,
   getRequestId,
@@ -10,7 +10,7 @@ export {
   getContextRequestId,
   clearRequestId,
   REQUEST_ID_HEADER,
-} from './request-id.js';
+} from './request-id';
 export {
   trackLimitRejection,
   trackProvider429,
@@ -27,4 +27,4 @@ export {
   getAverageJobLatency,
   LIMIT_REJECTION_TYPES,
   LIFECYCLE_EVENTS,
-} from './metrics.js';
+} from './metrics';

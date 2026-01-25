@@ -8,10 +8,10 @@
  * This allows for cleanup and notification logic.
  */
 
-import { createLogger } from '../../../lib/observability/logger';
-import { config } from '../../../lib/utils/config';
-import { generationRepo } from '../../../lib/db/repositories';
-import { GENERATION_STATUS } from '../../../lib/db/schema';
+import { createLogger } from '../../../../lib/observability/logger';
+import { config } from '../../../../lib/utils/config';
+import { generationRepo } from '../../../../lib/db/repositories';
+import { GENERATION_STATUS } from '../../../../lib/db/schema';
 
 const logger = createLogger({ route: '/api/worker/callback' });
 

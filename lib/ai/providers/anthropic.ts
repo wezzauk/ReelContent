@@ -17,7 +17,7 @@ import {
   Platform,
   ActionType,
 } from "../llm-client";
-import { trackProvider429, trackProviderSuccess } from "../../observability/index.js";
+import { trackProvider429, trackProviderSuccess } from "../../observability/index";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,

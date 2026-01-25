@@ -4,16 +4,16 @@
  * Handles GET /v1/generations/:id
  */
 
-import { ApiError, ERROR_CODES } from '../../security/errors.js';
-import { getUserFromHeader } from '../../security/auth.js';
-import { validatePath } from '../../security/validation.js';
+import { ApiError, ERROR_CODES } from '../../security/errors';
+import { getUserFromHeader } from '../../security/auth';
+import { validatePath } from '../../security/validation';
 import {
   getGenerationSchema,
   type GetGenerationRequest,
-} from '../schemas/requests.js';
-import { generationRepo, variantRepo } from '../../db/repositories.js';
-import { logger } from '../../observability/logger.js';
-import { getRequestId } from '../../observability/request-id.js';
+} from '../schemas/requests';
+import { generationRepo, variantRepo } from '../../db/repositories';
+import { logger } from '../../observability/logger';
+import { getRequestId } from '../../observability/request-id';
 
 /**
  * Handle GET /v1/generations/:id

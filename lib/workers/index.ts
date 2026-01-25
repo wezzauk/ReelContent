@@ -9,4 +9,4 @@ export {
   processGenerationJob,
   verifyQStashSignature,
   getWorkerHealth,
-} from './worker.js';
+} from './worker';

@@ -4,19 +4,19 @@
  * Handles POST /v1/library/assets and GET /v1/library/assets
  */
 
-import { ApiError, ERROR_CODES } from '../../security/errors.js';
-import { getUserFromHeader } from '../../security/auth.js';
-import { validateBody, validateQuery } from '../../security/validation.js';
+import { ApiError, ERROR_CODES } from '../../security/errors';
+import { getUserFromHeader } from '../../security/auth';
+import { validateBody, validateQuery } from '../../security/validation';
 import {
   createAssetSchema,
   listAssetsSchema,
   type CreateAssetRequest,
   type ListAssetsRequest,
-} from '../schemas/requests.js';
-import { assetRepo, draftRepo, variantRepo } from '../../db/repositories.js';
-import { getOrSetIdempotency } from '../../enforcement/index.js';
-import { logger } from '../../observability/logger.js';
-import { getRequestId } from '../../observability/request-id.js';
+} from '../schemas/requests';
+import { assetRepo, draftRepo, variantRepo } from '../../db/repositories';
+import { getOrSetIdempotency } from '../../enforcement/index';
+import { logger } from '../../observability/logger';
+import { getRequestId } from '../../observability/request-id';
 
 /**
  * Handle POST /v1/library/assets

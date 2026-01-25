@@ -5,9 +5,9 @@
  * and retry configuration.
  */
 
-import { config } from '../utils/config.js';
-import { recordJobEnqueued } from '../observability/index.js';
-import type { GenerationJob, JobLane } from './jobs.js';
+import { config } from '../utils/config';
+import { recordJobEnqueued } from '../observability/index';
+import type { GenerationJob, JobLane } from './jobs';
 
 /**
  * Default retry count for jobs

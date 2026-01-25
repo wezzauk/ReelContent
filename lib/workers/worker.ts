@@ -12,8 +12,8 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { config } from '../utils/config.js';
-import { createLogger } from '../observability/logger.js';
+import { config } from '../utils/config';
+import { createLogger } from '../observability/logger';
 import {
   recordJobEnqueued,
   recordJobStarted,
@@ -23,7 +23,7 @@ import {
   logLifecycleEvent,
   LIFECYCLE_EVENTS,
   setRequestId,
-} from '../observability/index.js';
+} from '../observability/index';
 import {
   generationRepo,
   draftRepo,
@@ -31,7 +31,7 @@ import {
   usageLedgerRepo,
   subscriptionRepo,
   boostRepo,
-} from '../db/repositories.js';
+} from '../db/repositories';
 import {
   enforceMonthlyPool,
   enforceHourlyBurst,
@@ -39,12 +39,12 @@ import {
   releaseProviderConcurrency,
   getMonthlyUsage,
   getHourlyUsage,
-} from '../enforcement/index.js';
-import { getEffectiveLimits, type PlanType, type PlanLimits } from '../billing/plans.js';
-import { calculateCost, formatMonthKeyForLedger, getHardCapsForPlan, HARD_CAPS } from '../billing/provider-pricing.js';
-import { generateContent, type GenerateContentRequest } from '../ai/llm-client.js';
-import type { GenerationJob, JobLane } from '../queue/jobs.js';
-import { GENERATION_STATUS, PLAN_TYPE } from '../db/schema.js';
+} from '../enforcement/index';
+import { getEffectiveLimits, type PlanType, type PlanLimits } from '../billing/plans';
+import { calculateCost, formatMonthKeyForLedger, getHardCapsForPlan, HARD_CAPS } from '../billing/provider-pricing';
+import { generateContent, type GenerateContentRequest } from '../ai/llm-client';
+import type { GenerationJob, JobLane } from '../queue/jobs';
+import { GENERATION_STATUS, PLAN_TYPE } from '../db/schema';
 
 const logger = createLogger({ module: 'worker' });
 
@@ -598,7 +598,7 @@ export async function getWorkerHealth(): Promise<{
 
   // Redis health check
   try {
-    const { redis } = await import('../redis/client.js');
+    const { redis } = await import('../redis/client');
     await redis.ping();
     checks.redis = true;
   } catch {

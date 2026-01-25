@@ -18,19 +18,19 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { ApiError, ERROR_CODES } from '../../security/errors.js';
-import { getUserFromHeader } from '../../security/auth.js';
-import { validateBody } from '../../security/validation.js';
+import { ApiError, ERROR_CODES } from '../../security/errors';
+import { getUserFromHeader } from '../../security/auth';
+import { validateBody } from '../../security/validation';
 import {
   regenerateSchema,
   type RegenerateRequest,
-} from '../schemas/requests.js';
+} from '../schemas/requests';
 import {
   draftRepo,
   generationRepo,
   subscriptionRepo,
   boostRepo,
-} from '../../db/repositories.js';
+} from '../../db/repositories';
 import {
   enforceMonthlyPool,
   enforceHourlyBurst,
@@ -39,12 +39,12 @@ import {
   acquireProviderConcurrency,
   checkAndSetRegenCooldown,
   getOrSetIdempotency,
-} from '../../enforcement/index.js';
-import { getEffectiveLimits, PLANS } from '../../billing/plans.js';
-import { enqueueWithRetry, JOB_LANE } from '../../queue/index.js';
-import { logger } from '../../observability/logger.js';
-import { getRequestId } from '../../observability/request-id.js';
-import { PLAN_TYPE } from '../../db/schema.js';
+} from '../../enforcement/index';
+import { getEffectiveLimits, PLANS } from '../../billing/plans';
+import { enqueueWithRetry, JOB_LANE } from '../../queue/index';
+import { logger } from '../../observability/logger';
+import { getRequestId } from '../../observability/request-id';
+import { PLAN_TYPE } from '../../db/schema';
 
 /**
  * Handle POST /v1/regenerate
@@ -223,7 +223,7 @@ export async function handleRegenerate(request: Request): Promise<Response> {
       }
 
       // 15. Enqueue regeneration job
-      const { enqueueWithRetry: enqueue, createGenerationJob, JOB_LANE: LANE } = await import('../../queue/index.js');
+      const { enqueueWithRetry: enqueue, createGenerationJob, JOB_LANE: LANE } = await import('../../queue/index');
       const job = createGenerationJob({
         userId: user.userId,
         draftId: draft.id,
@@ -285,7 +285,7 @@ export async function handleRegenerate(request: Request): Promise<Response> {
  */
 async function releaseUserLease(userId: string, leaseId: string): Promise<void> {
   try {
-    const { releaseUserConcurrency } = await import('../../enforcement/index.js');
+    const { releaseUserConcurrency } = await import('../../enforcement/index');
     await releaseUserConcurrency(userId, leaseId);
   } catch (e) {
     // Ignore cleanup errors
@@ -302,7 +302,7 @@ async function releaseProviderLease(
   leaseId: string
 ): Promise<void> {
   try {
-    const { releaseProviderConcurrency } = await import('../../enforcement/index.js');
+    const { releaseProviderConcurrency } = await import('../../enforcement/index');
     await releaseProviderConcurrency(provider, model, lane, leaseId);
   } catch (e) {
     // Ignore cleanup errors

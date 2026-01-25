@@ -10,10 +10,16 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:ui": "vitest --ui",
+    "test:smoke": "vitest run tests/smoke.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "deploy": "./scripts/deploy.sh",
+    "deploy:vercel": "./scripts/deploy.sh vercel",
+    "deploy:cloudrun": "./scripts/deploy.sh cloudrun",
+    "deploy:all": "./scripts/deploy.sh all",
+    "deploy:verify": "./scripts/deploy.sh verify"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

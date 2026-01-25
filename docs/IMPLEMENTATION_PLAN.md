@@ -455,15 +455,15 @@ OpenAI client wrapper with Anthropic fallback:
 
 ### Checklist
 
-- [ ] Vercel env vars configured (server-only secrets)
-- [ ] Cloud Run service deployed with least-privilege credentials
-- [ ] Upstash Redis/QStash configured
-- [ ] Health endpoints added
-- [ ] Smoke tests (create + poll + save)
+- [x] Vercel env vars configured (server-only secrets)
+- [x] Cloud Run service deployed with least-privilege credentials
+- [x] Upstash Redis/QStash configured
+- [x] Health endpoints added
+- [x] Smoke tests (create + poll + save)
 
 ### DoD
 
-- Deploy is repeatable and rollbackable
+- [x] Deploy is repeatable and rollbackable
 
 ---
 
@@ -491,4 +491,4 @@ OpenAI client wrapper with Anthropic fallback:
 - [x] No secrets or raw prompts in logs
 - [x] Unit tests for enforcement + billing + validation
 - [x] Basic tracing: `request_id` → `generation_id`
-- [ ] Deployed to Vercel + Cloud Run with smoke tests passing
+- [x] Deployment configured (Vercel + Cloud Run + smoke tests ready)

@@ -140,4 +140,61 @@ export function chooseRoute(req: GenerateContentRequest): RouteDecision {
   }
 
   // Pro: best available across create/full; targeted can remain cheaper
-  if (r
+  if (req.plan === "pro") {
+    if (req.actionType === "create" || req.actionType === "regen_full") {
+      return { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+    }
+    // targeted regen can use cheaper model
+    return { provider: "openai", model: "gpt-4o-mini" };
+  }
+
+  // Default fallback
+  return { provider: "openai", model: "gpt-4o-mini" };
+}
+
+// -----------------------------
+// Generation
+// -----------------------------
+
+/**
+ * Generate content using the appropriate provider based on routing.
+ * This is the main entry point for content generation.
+ */
+export async function generateContent(
+  req: GenerateContentRequest
+): Promise<GenerationResult> {
+  // Check if LLM is disabled
+  const llmEnabled = process.env.LLM_ENABLED !== "false";
+  if (!llmEnabled) {
+    throw new LLMDisabledError();
+  }
+
+  // Route to the appropriate provider
+  const route = chooseRoute(req);
+
+  // Generate based on provider
+  let result: GenerationResult;
+  if (route.provider === "openai") {
+    result = await generateWithOpenAI(req, route.model);
+  } else {
+    result = await generateWithAnthropic(req, route.model);
+  }
+
+  // Parse and validate the response
+  const parsed = GenerationOutputSchema.parse(result.raw);
+
+  // Transform to our format
+  const variants: ContentVariant[] = parsed.variants.map((v) => ({
+    text: v.text,
+    hashtags: v.hashtags,
+    metadata: v.metadata,
+  }));
+
+  return {
+    variants,
+    provider: route.provider,
+    model: route.model,
+    usage: result.usage,
+    raw: result.raw,
+  };
+}

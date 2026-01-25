@@ -5,13 +5,13 @@
  * Verifies QStash signatures and delegates to the worker handler.
  */
 
-import { config } from '../../../lib/utils/config';
-import { createLogger } from '../../../lib/observability/logger';
+import { config } from '../../../../lib/utils/config';
+import { createLogger } from '../../../../lib/observability/logger';
 import {
   validateGenerationJob,
   type GenerationJob,
-} from '../../../lib/queue/jobs';
-import { processGenerationJob, verifyQStashSignature, getWorkerHealth } from '../../../lib/workers/worker';
+} from '../../../../lib/queue/jobs';
+import { processGenerationJob, verifyQStashSignature, getWorkerHealth } from '../../../../lib/workers/worker';
 
 const logger = createLogger({ route: '/api/worker/generate' });
 

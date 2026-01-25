@@ -5,7 +5,7 @@
  * and processed by the worker service.
  */
 
-import { getRequestId } from '../observability/request-id.js';
+import { getRequestId } from '../observability/request-id';
 
 /**
  * Job types supported by the queue

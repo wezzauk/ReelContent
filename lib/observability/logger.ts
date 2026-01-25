@@ -3,7 +3,7 @@
  */
 
 import pino, { type Logger } from 'pino';
-import { config } from '../utils/config.js';
+import { config } from '../utils/config';
 
 /**
  * Create the base logger instance

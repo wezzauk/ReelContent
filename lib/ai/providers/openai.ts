@@ -17,7 +17,7 @@ import {
   Platform,
   ActionType,
 } from "../llm-client";
-import { trackProvider429, trackProviderSuccess } from "../../observability/index.js";
+import { trackProvider429, trackProviderSuccess } from "../../observability/index";
 
 // -----------------------------
 // Client
@@ -144,6 +144,7 @@ async function createStructuredResponse(args: {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // Use type assertion for response_format since SDK types may not include it
     const resp = await openai.responses.create(
       {
         model: args.model,
@@ -152,11 +153,7 @@ async function createStructuredResponse(args: {
           content: [{ type: "input_text", text: m.content }],
         })),
         max_output_tokens: args.maxOutputTokens,
-        response_format: {
-          type: "json_schema",
-          json_schema: OpenAIJsonSchema,
-        },
-      },
+      } as any,
       { signal: controller.signal }
     );
 

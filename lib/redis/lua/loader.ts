@@ -6,7 +6,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { redis, type RedisClient } from '../client.js';
+import { redis, type RedisClient } from '../client';
 
 /**
  * Script metadata interface

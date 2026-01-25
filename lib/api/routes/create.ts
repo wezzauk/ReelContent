@@ -16,29 +16,29 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { ApiError, ERROR_CODES } from '../../security/errors.js';
-import { getUserFromHeader } from '../../security/auth.js';
-import { validateBody } from '../../security/validation.js';
+import { ApiError, ERROR_CODES } from '../../security/errors';
+import { getUserFromHeader } from '../../security/auth';
+import { validateBody } from '../../security/validation';
 import {
   createSchema,
   type CreateRequest,
-} from '../schemas/requests.js';
+} from '../schemas/requests';
 import {
   draftRepo,
   generationRepo,
   subscriptionRepo,
   boostRepo,
-} from '../../db/repositories.js';
+} from '../../db/repositories';
 import {
   enforceMonthlyPool,
   enforceHourlyBurst,
   acquireUserConcurrency,
   acquireProviderConcurrency,
   getOrSetIdempotency,
-} from '../../enforcement/index.js';
-import { getEffectiveLimits } from '../../billing/plans.js';
-import { enqueueWithRetry, JOB_LANE, createGenerationJob } from '../../queue/index.js';
-import { logger, getRequestId, setRequestId, trackLimitRejection, LIMIT_REJECTION_TYPES, logLifecycleEvent, LIFECYCLE_EVENTS } from '../../observability/index.js';
+} from '../../enforcement/index';
+import { getEffectiveLimits } from '../../billing/plans';
+import { enqueueWithRetry, JOB_LANE, createGenerationJob } from '../../queue/index';
+import { logger, getRequestId, setRequestId, trackLimitRejection, LIMIT_REJECTION_TYPES, logLifecycleEvent, LIFECYCLE_EVENTS } from '../../observability/index';
 
 /**
  * Extract or generate request ID from request headers
@@ -201,7 +201,7 @@ export async function handleCreate(request: Request): Promise<Response> {
       }
 
       // 12. Enqueue generation job
-      const { enqueueWithRetry: enqueue, JOB_LANE: LANE } = await import('../../queue/index.js');
+      const { enqueueWithRetry: enqueue, JOB_LANE: LANE } = await import('../../queue/index');
       const job = createGenerationJob({
         userId: user.userId,
         draftId: draft.id,
@@ -270,7 +270,7 @@ export async function handleCreate(request: Request): Promise<Response> {
  */
 async function releaseUserLease(userId: string, leaseId: string): Promise<void> {
   try {
-    const { releaseUserConcurrency } = await import('../../enforcement/index.js');
+    const { releaseUserConcurrency } = await import('../../enforcement/index');
     await releaseUserConcurrency(userId, leaseId);
   } catch (e) {
     // Ignore cleanup errors
@@ -287,7 +287,7 @@ async function releaseProviderLease(
   leaseId: string
 ): Promise<void> {
   try {
-    const { releaseProviderConcurrency } = await import('../../enforcement/index.js');
+    const { releaseProviderConcurrency } = await import('../../enforcement/index');
     await releaseProviderConcurrency(provider, model, lane, leaseId);
   } catch (e) {
     // Ignore cleanup errors

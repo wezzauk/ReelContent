@@ -11,7 +11,7 @@ export type {
   JobLane,
   JobStatus,
   RegenType,
-} from './jobs.js';
+} from './jobs';
 
 export {
   JOB_TYPE,
@@ -20,7 +20,7 @@ export {
   REGEN_TYPE,
   createGenerationJob,
   validateGenerationJob,
-} from './jobs.js';
+} from './jobs';
 
 // Enqueue functions
 export {
@@ -31,4 +31,4 @@ export {
   cancelJob,
   getQueueStats,
   LANE_CONFIG,
-} from './enqueue.js';
+} from './enqueue';

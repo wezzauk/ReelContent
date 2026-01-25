@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { PLATFORM } from '../../db/schema.js';
+import { PLATFORM } from '../../db/schema';
 
 // ============================================================================
 // Common Schemas

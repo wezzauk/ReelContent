@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 
+const urlSchema = z.string().url().or(z.literal(''));
+
 /**
  * Environment variable schema for validation
  */
@@ -15,17 +17,17 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
 
   // Redis (Upstash)
-  UPSTASH_REDIS_REST_URL: z.string().url().optional().default(''),
+  UPSTASH_REDIS_REST_URL: urlSchema.optional().default(''),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional().default(''),
 
   // QStash (for job queue)
-  QSTASH_URL: z.string().url().optional().default(''),
+  QSTASH_URL: urlSchema.optional().default(''),
   QSTASH_TOKEN: z.string().optional().default(''),
   QSTASH_CURRENT_SIGNING_KEY: z.string().optional().default(''),
   QSTASH_NEXT_SIGNING_KEY: z.string().optional().default(''),
 
   // Auth
-  AUTH_SECRET: z.string().min(32).optional().default(''),
+  AUTH_SECRET: z.string().min(32).optional().default('development-secret-key-for-testing-only'),
 
   // AI Providers
   OPENAI_API_KEY: z.string().optional().default(''),

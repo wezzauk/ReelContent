@@ -8,8 +8,8 @@
  * - Generation lifecycle events
  */
 
-import { createLogger } from './logger.js';
-import type { GenerationJob } from '../queue/jobs.js';
+import { createLogger } from './logger';
+import type { GenerationJob } from '../queue/jobs';
 
 const logger = createLogger({ module: 'metrics' });
 
