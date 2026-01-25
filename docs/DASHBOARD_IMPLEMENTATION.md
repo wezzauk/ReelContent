@@ -222,8 +222,8 @@ Currently, all API routes return **mock data**:
    - Call `getUserUsage(ctx.userId)`
 
 ### Deliverables
-- [ ] `lib/db/repos/usage.ts` implemented
-- [ ] `/api/usage` returns real usage data
+- [x] `lib/db/repos/usage.ts` implemented
+- [x] `/api/usage` returns real usage data
 
 ---
 
