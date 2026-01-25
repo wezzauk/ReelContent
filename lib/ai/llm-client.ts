@@ -10,6 +10,24 @@ import { generateWithOpenAI } from "./providers/openai";
 import { generateWithAnthropic } from "./providers/anthropic";
 
 // -----------------------------
+// Errors
+// -----------------------------
+
+/**
+ * Thrown when global LLM generation is disabled via env flag.
+ * This should be treated as:
+ * - non-retryable
+ * - HTTP 503 in API layer
+ * - immediate fail in workers (no retries)
+ */
+export class LLMDisabledError extends Error {
+  constructor() {
+    super("LLM generation is currently disabled");
+    this.name = "LLMDisabledError";
+  }
+}
+
+// -----------------------------
 // Types
 // -----------------------------
 
@@ -24,7 +42,6 @@ export interface Calibration {
   audience?: string;
   tone?: string;
   goals?: string[];
-  // You can extend this later, but keep it stable for v1.
 }
 
 export interface GenerateContentRequest {
@@ -33,29 +50,26 @@ export interface GenerateContentRequest {
   platform: Platform;
   variants: number;
 
-  // Preset and other spec-driven inputs can be added here.
-  // Keep nesting shallow: group related fields.
   input: {
     topic: string;
-    notes?: string; // optional extra context
+    notes?: string;
   };
 
   calibration: Calibration;
 
-  // Anti-repetition / memory hints (optional v1 hooks)
-  // Keep these short + bounded.
+  // Optional anti-repetition hints
   recentHooks?: string[];
   recentCTAs?: string[];
   recentHashtags?: string[];
 
-  // Optional request correlation IDs for observability
+  // Optional observability
   requestId?: string;
   generationId?: string;
 }
 
 export interface ContentVariant {
-  text: string; // caption / post content
-  hashtags: string[]; // suggested hashtags (separate field)
+  text: string;
+  hashtags: string[];
   metadata: {
     hook: string;
     benefit: string;
@@ -72,7 +86,7 @@ export interface GenerationResult {
     outputTokens?: number;
     totalTokens?: number;
   };
-  raw?: unknown; // optional: keep disabled by default in logs
+  raw?: unknown;
 }
 
 // -----------------------------
@@ -116,45 +130,14 @@ export function chooseRoute(req: GenerateContentRequest): RouteDecision {
 
   // Standard: better quality for create, cheaper for targeted regen
   if (req.plan === "standard") {
-    if (req.actionType === "create") return { provider: "openai", model: "gpt-4.1-mini" };
-    if (req.actionType === "regen_targeted") return { provider: "openai", model: "gpt-4o-mini" };
+    if (req.actionType === "create") {
+      return { provider: "openai", model: "gpt-4.1-mini" };
+    }
+    if (req.actionType === "regen_targeted") {
+      return { provider: "openai", model: "gpt-4o-mini" };
+    }
     return { provider: "openai", model: "gpt-4.1-mini" }; // full regen
   }
 
   // Pro: best available across create/full; targeted can remain cheaper
-  if (req.actionType === "regen_targeted") {
-    return { provider: "openai", model: "gpt-4o-mini" };
-  }
-  return { provider: "openai", model: "gpt-4.1-mini" };
-}
-
-// -----------------------------
-// Public entrypoint
-// -----------------------------
-
-/**
- * The single entrypoint the worker/API should call for generation.
- */
-export async function generateContent(req: GenerateContentRequest): Promise<GenerationResult> {
-  const route = chooseRoute(req);
-
-  // Guardrails: variants must be a small positive integer
-  // (Your plan enforcement should already enforce this, but defense-in-depth here helps.)
-  const variants = clampInt(req.variants, 1, 10);
-
-  const normalizedReq: GenerateContentRequest = { ...req, variants };
-
-  if (route.provider === "openai") {
-    return generateWithOpenAI(normalizedReq, route.model);
-  }
-
-  return generateWithAnthropic(normalizedReq, route.model);
-}
-
-function clampInt(value: number, min: number, max: number): number {
-  if (!Number.isFinite(value)) return min;
-  const v = Math.trunc(value);
-  if (v < min) return min;
-  if (v > max) return max;
-  return v;
-}
+  if (r

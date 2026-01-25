@@ -1,0 +1,85 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "name": "reel-content",
+  "框架": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "regions": ["iad1"],
+  "env": {
+    "@reel-content-auth-secret": {
+      "type": "secret",
+      "description": "Auth secret for session management"
+    },
+    "@reel-content-database-url": {
+      "type": "secret",
+      "description": "Neon PostgreSQL connection string"
+    },
+    "@reel-content-upstash-redis-url": {
+      "type": "secret",
+      "description": "Upstash Redis REST URL"
+    },
+    "@reel-content-upstash-redis-token": {
+      "type": "secret",
+      "description": "Upstash Redis REST token"
+    },
+    "@reel-content-qstash-url": {
+      "type": "secret",
+      "description": "QStash API URL"
+    },
+    "@reel-content-qstash-token": {
+      "type": "secret",
+      "description": "QStash API token"
+    },
+    "@reel-content-qstash-signing-key": {
+      "type": "secret",
+      "description": "QStash current signing key"
+    },
+    "@reel-content-qstash-next-key": {
+      "type": "secret",
+      "description": "QStash next signing key"
+    },
+    "@reel-content-openai-api-key": {
+      "type": "secret",
+      "description": "OpenAI API key"
+    },
+    "@reel-content-anthropic-api-key": {
+      "type": "secret",
+      "description": "Anthropic API key"
+    },
+    "LLM_ENABLED": {
+      "type": "plain",
+      "value": "true"
+    }
+  },
+  "functions": {
+    "app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/health",
+      "destination": "/api/health"
+    }
+  ]
+}
