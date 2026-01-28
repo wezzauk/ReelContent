@@ -3,8 +3,30 @@
  */
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { getUserFromHeader } from './auth';
+import { getUserFromHeader, verifyToken } from './auth';
 import { sanitizeError, errorResponse, ERROR_CODES } from './errors';
+
+/**
+ * Get user from request - checks both cookie and Authorization header
+ */
+async function getUserFromRequest(
+  request: NextRequest
+): Promise<{ userId: string; email: string; plan: string } | null> {
+  // First try Authorization header
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const user = await getUserFromHeader(authHeader);
+    if (user) return user;
+  }
+
+  // Fall back to cookie
+  const cookieToken = request.cookies.get('auth_token')?.value;
+  if (cookieToken) {
+    return verifyToken(cookieToken);
+  }
+
+  return null;
+}
 
 /**
  * Allowed origins for CORS (configure per environment)
@@ -98,15 +120,21 @@ export async function authGuard(
   request: NextRequest
 ): Promise<NextResponse | null> {
   // Skip auth for truly public routes
-  const publicPaths = ['/health', '/api/health', '/api/webhooks'];
+  const publicPaths = [
+    '/health',
+    '/api/health',
+    '/api/webhooks',
+    '/api/auth/signup',
+    '/api/auth/signin',
+    '/api/worker', // Worker endpoints (authenticated via QStash signature)
+  ];
   if (publicPaths.some((path) => request.nextUrl.pathname.startsWith(path))) {
     return null;
   }
 
   // All API routes require authentication
   if (request.nextUrl.pathname.startsWith('/api/')) {
-    const authHeader = request.headers.get('Authorization');
-    const user = await getUserFromHeader(authHeader);
+    const user = await getUserFromRequest(request);
 
     if (!user) {
       const response = NextResponse.json(
@@ -127,8 +155,7 @@ export async function authGuard(
   // Dashboard routes also require authentication
   const protectedPaths = ['/dashboard', '/create', '/review', '/library'];
   if (protectedPaths.some((path) => request.nextUrl.pathname.startsWith(path))) {
-    const authHeader = request.headers.get('Authorization');
-    const user = await getUserFromHeader(authHeader);
+    const user = await getUserFromRequest(request);
 
     if (!user) {
       const response = NextResponse.redirect(new URL('/login', request.url));

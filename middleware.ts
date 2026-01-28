@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { handleRequest, config } from '@/lib/security/middleware';
+import { handleRequest } from '@/lib/security/middleware';
 
 export function middleware(request: NextRequest) {
   return handleRequest(request);

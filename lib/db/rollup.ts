@@ -50,7 +50,7 @@ interface RollupResult {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  costEstimate: number | null;
+  costEstimate: string | null;
 }
 
 /**
@@ -118,7 +118,7 @@ export async function aggregateDailyUsage(targetDate: Date): Promise<number> {
           promptTokens: row.promptTokens,
           completionTokens: row.completionTokens,
           totalTokens: row.totalTokens,
-          costEstimate: row.costEstimate,
+          costEstimate: String(row.costEstimate),
           updatedAt: new Date(),
         })
         .where(eq(usageRollups.id, existing[0].id));
@@ -132,7 +132,7 @@ export async function aggregateDailyUsage(targetDate: Date): Promise<number> {
         promptTokens: row.promptTokens,
         completionTokens: row.completionTokens,
         totalTokens: row.totalTokens,
-        costEstimate: row.costEstimate,
+        costEstimate: String(row.costEstimate),
       });
     }
     inserted++;
@@ -198,7 +198,7 @@ export async function aggregateMonthlyUsage(year: number, month: number): Promis
           promptTokens: row.promptTokens,
           completionTokens: row.completionTokens,
           totalTokens: row.totalTokens,
-          costEstimate: row.costEstimate,
+          costEstimate: String(row.costEstimate),
           updatedAt: new Date(),
         })
         .where(eq(usageRollups.id, existing[0].id));
@@ -212,7 +212,7 @@ export async function aggregateMonthlyUsage(year: number, month: number): Promis
         promptTokens: row.promptTokens,
         completionTokens: row.completionTokens,
         totalTokens: row.totalTokens,
-        costEstimate: row.costEstimate,
+        costEstimate: String(row.costEstimate),
       });
     }
     inserted++;
@@ -264,7 +264,7 @@ export async function getUsageSummary(
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
-  costEstimate: number | null;
+  costEstimate: string | null;
 }>> {
   const db = getDb();
 

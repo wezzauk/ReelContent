@@ -56,22 +56,15 @@ const OpenAIJsonSchema = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["text", "hashtags", "metadata"],
+          required: ["hook", "benefit", "body", "cta", "hashtags"],
           properties: {
-            text: { type: "string" },
+            hook: { type: "string" },
+            benefit: { type: "string" },
+            body: { type: "string" },
+            cta: { type: "string" },
             hashtags: {
               type: "array",
               items: { type: "string" },
-            },
-            metadata: {
-              type: "object",
-              additionalProperties: false,
-              required: ["hook", "benefit", "cta"],
-              properties: {
-                hook: { type: "string" },
-                benefit: { type: "string" },
-                cta: { type: "string" },
-              },
             },
           },
         },
@@ -95,7 +88,8 @@ export async function generateWithOpenAI(
   // Try primary call; on schema/parse issues, do a single repair attempt.
   const first = await callWithRetry(() => createStructuredResponse({ model, messages, maxOutputTokens }));
   const parsed1 = parseStructured(first);
-  const validated1 = safeValidate(parsed1);
+  const transformed1 = transformOpenAIResponse(parsed1);
+  const validated1 = safeValidate(transformed1);
 
   if (validated1.ok) {
     return {
@@ -103,6 +97,7 @@ export async function generateWithOpenAI(
       provider: "openai",
       model,
       usage: extractUsage(first),
+      raw: transformed1, // Include raw for llm-client
     };
   }
 
@@ -110,7 +105,8 @@ export async function generateWithOpenAI(
   const repairMessages = buildRepairMessages(req, parsed1, validated1.errorMessage);
   const second = await callWithRetry(() => createStructuredResponse({ model, messages: repairMessages, maxOutputTokens }));
   const parsed2 = parseStructured(second);
-  const validated2 = safeValidate(parsed2);
+  const transformed2 = transformOpenAIResponse(parsed2);
+  const validated2 = safeValidate(transformed2);
 
   if (!validated2.ok) {
     throw new Error(`OpenAI output validation failed: ${validated2.errorMessage}`);
@@ -121,6 +117,7 @@ export async function generateWithOpenAI(
     provider: "openai",
     model,
     usage: extractUsage(second),
+    raw: transformed2, // Include raw for llm-client
   };
 }
 
@@ -133,27 +130,20 @@ async function createStructuredResponse(args: {
   messages: Array<{ role: "system" | "user"; content: string }>;
   maxOutputTokens: number;
 }): Promise<any> {
-  // Prefer the Responses API when available; if your OpenAI SDK uses chat.completions,
-  // you can adapt. This is written to the current OpenAI JS SDK patterns.
-  //
-  // If your SDK version doesn't support `responses.create`, switch to:
-  // openai.chat.completions.create({... response_format ...})
-
   const controller = new AbortController();
   const timeoutMs = 25_000; // keep bounded
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    // Use type assertion for response_format since SDK types may not include it
-    const resp = await openai.responses.create(
+    // Use Chat Completions API with JSON mode for structured outputs
+    const resp = await openai.chat.completions.create(
       {
         model: args.model,
-        input: args.messages.map((m) => ({
-          role: m.role,
-          content: [{ type: "input_text", text: m.content }],
-        })),
-        max_output_tokens: args.maxOutputTokens,
-      } as any,
+        messages: args.messages,
+        max_tokens: args.maxOutputTokens,
+        response_format: { type: "json_schema", json_schema: OpenAIJsonSchema } as any,
+        temperature: 0.7,
+      },
       { signal: controller.signal }
     );
 
@@ -241,21 +231,35 @@ function buildRepairMessages(
 // -----------------------------
 
 function parseStructured(resp: any): unknown {
-  // Responses API typically returns structured output in resp.output_text or output array.
-  // We'll be defensive: try multiple common shapes.
-  const text =
-    resp?.output_text ??
-    extractFirstText(resp) ??
-    "";
+  // Chat Completions API returns structured output in resp.choices[0].message.content
+  const content = resp?.choices?.[0]?.message?.content;
+  
+  if (content && typeof content === 'string') {
+    let text = content.trim();
+    
+    // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+    if (text.startsWith('```json')) {
+      text = text.slice(7); // Remove ```json
+    } else if (text.startsWith('```')) {
+      text = text.slice(3); // Remove ```
+    }
+    if (text.endsWith('```')) {
+      text = text.slice(0, -3); // Remove trailing ```
+    }
+    text = text.trim();
 
-  if (!text) return resp; // fallback: maybe already JSON?
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    // Sometimes SDK may already return parsed JSON. Return raw text.
-    return text;
+    try {
+      const parsed = JSON.parse(text);
+      return parsed;
+    } catch (e) {
+      console.error('[OpenAI] Failed to parse response as JSON:', e);
+      console.error('[OpenAI] Text that failed to parse:', text.substring(0, 500));
+      return text;
+    }
   }
+
+  // Fallback: maybe already parsed JSON
+  return resp;
 }
 
 function extractFirstText(resp: any): string | null {
@@ -274,28 +278,63 @@ function extractFirstText(resp: any): string | null {
   return null;
 }
 
+/**
+ * Transform OpenAI response format to our expected format
+ * OpenAI returns: { hook, benefit, body, cta, hashtags }
+ * We need: { text, hashtags, metadata: { hook, benefit, cta } }
+ */
+function transformOpenAIResponse(data: any): unknown {
+  if (!data || typeof data !== 'object') return data;
+  
+  // If it doesn't have variants, return as-is
+  if (!data.variants || !Array.isArray(data.variants)) return data;
+
+  return {
+    variants: data.variants.map((v: any) => {
+      // If already in correct format, return as-is
+      if (v.text && v.metadata) return v;
+
+      // Transform from OpenAI format to our format
+      // Combine hook, benefit, body, and cta into the text field
+      const text = [v.hook, v.benefit, v.body, v.cta]
+        .filter(Boolean)
+        .join('\n\n');
+
+      return {
+        text,
+        hashtags: v.hashtags || [],
+        metadata: {
+          hook: v.hook || '',
+          benefit: v.benefit || '',
+          cta: v.cta || '',
+        },
+      };
+    }),
+  };
+}
+
 function safeValidate(
   data: unknown
 ): { ok: true; data: z.infer<typeof GenerationOutputSchema> } | { ok: false; errorMessage: string } {
   const result = GenerationOutputSchema.safeParse(data);
   if (result.success) return { ok: true, data: result.data };
 
-  return { ok: false, errorMessage: result.error.issues.map((i) => i.message).join("; ") };
+  // Log the actual data that failed validation for debugging
+  console.error('[OpenAI] Validation failed for data:', JSON.stringify(data, null, 2));
+  console.error('[OpenAI] Validation errors:', result.error.issues);
+
+  return { ok: false, errorMessage: result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join("; ") };
 }
 
 function extractUsage(resp: any): GenerationResult["usage"] | undefined {
-  // Different SDK versions may place usage differently.
+  // Chat Completions API returns usage in resp.usage
   const usage = resp?.usage;
   if (!usage) return undefined;
 
-  const inputTokens = usage?.input_tokens ?? usage?.prompt_tokens;
-  const outputTokens = usage?.output_tokens ?? usage?.completion_tokens;
-  const totalTokens = usage?.total_tokens;
-
   return {
-    inputTokens: typeof inputTokens === "number" ? inputTokens : undefined,
-    outputTokens: typeof outputTokens === "number" ? outputTokens : undefined,
-    totalTokens: typeof totalTokens === "number" ? totalTokens : undefined,
+    inputTokens: usage.prompt_tokens,
+    outputTokens: usage.completion_tokens,
+    totalTokens: usage.total_tokens,
   };
 }
 

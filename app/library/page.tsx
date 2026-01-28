@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { AppShell } from "@/components/AppShell";
@@ -498,7 +498,19 @@ function LibraryContent() {
 export default function LibraryPage() {
   return (
     <AppShell activeHref="/library">
-      <LibraryContent />
+      <Suspense fallback={<LibraryLoading />}>
+        <LibraryContent />
+      </Suspense>
     </AppShell>
+  );
+}
+
+function LibraryLoading() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="animate-pulse rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 h-48" />
+      ))}
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Lua script loader - loads and registers Lua scripts with the Redis client
  *
- * Scripts are loaded once at startup and called by their registered SHA.
+ * Scripts are loaded lazily on first use and cached for subsequent calls.
  */
 
 import fs from 'node:fs/promises';
@@ -22,6 +22,11 @@ interface ScriptInfo {
 const scriptRegistry = new Map<string, ScriptInfo>();
 
 /**
+ * Scripts directory path
+ */
+const SCRIPTS_DIR = path.join(process.cwd(), 'lib', 'redis', 'lua');
+
+/**
  * Load a Lua script from file and register with Redis
  *
  * @param client - Redis client to register with
@@ -39,28 +44,36 @@ async function loadScript(client: RedisClient, scriptPath: string): Promise<stri
 }
 
 /**
- * Load all Lua scripts from a directory
- *
- * @param client - Redis client to register with
- * @param dirPath - Path to directory containing .lua files
- * @returns Map of script names to their info
+ * Load all Lua scripts from the scripts directory
  */
-export async function loadAllScripts(client: RedisClient, dirPath: string): Promise<Map<string, ScriptInfo>> {
-  const entries = await fs.readdir(dirPath, { withFileTypes: true });
-  const luaFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.lua'));
+async function loadAllScriptsInternal(): Promise<void> {
+  try {
+    const entries = await fs.readdir(SCRIPTS_DIR, { withFileTypes: true });
+    const luaFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.lua'));
 
-  await Promise.all(luaFiles.map((e) => loadScript(client, path.join(dirPath, e.name))));
-
-  return scriptRegistry;
+    await Promise.all(luaFiles.map((e) => loadScript(redis, path.join(SCRIPTS_DIR, e.name))));
+  } catch (error) {
+    console.error('Failed to load Lua scripts:', error);
+  }
 }
 
 /**
- * Get a script by name
+ * Get a script by name, loading it if necessary
  *
  * @param name - Script name (without .lua extension)
  * @returns Script info or undefined if not found
  */
-export function getScript(name: string): ScriptInfo | undefined {
+export async function getScript(name: string): Promise<ScriptInfo | undefined> {
+  // Check cache first
+  if (scriptRegistry.has(name)) {
+    return scriptRegistry.get(name);
+  }
+
+  // Load all scripts on first call
+  if (scriptRegistry.size === 0) {
+    await loadAllScriptsInternal();
+  }
+
   return scriptRegistry.get(name);
 }
 

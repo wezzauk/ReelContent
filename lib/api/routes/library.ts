@@ -5,7 +5,7 @@
  */
 
 import { ApiError, ERROR_CODES } from '../../security/errors';
-import { getUserFromHeader } from '../../security/auth';
+import { getUserFromRequest } from '../../security/auth';
 import { validateBody, validateQuery } from '../../security/validation';
 import {
   createAssetSchema,
@@ -28,7 +28,7 @@ export async function handleCreateAsset(request: Request): Promise<Response> {
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
@@ -148,7 +148,7 @@ export async function handleListAssets(request: Request): Promise<Response> {
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
@@ -239,7 +239,7 @@ export async function handleDeleteAsset(request: Request, assetId: string): Prom
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
@@ -297,7 +297,7 @@ export async function handleArchiveAsset(request: Request, assetId: string): Pro
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }

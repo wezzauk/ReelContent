@@ -10,12 +10,11 @@ import { config } from '../utils/config';
  */
 const baseLogger = pino({
   level: config.NODE_ENV === 'production' ? 'info' : 'debug',
-  transport: config.NODE_ENV !== 'production' ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-    },
-  } : undefined,
+  // Disable pino-pretty in development to avoid worker thread issues in Next.js
+  // Use simple console output instead
+  browser: {
+    asObject: false,
+  },
   base: {
     env: config.NODE_ENV,
   },

@@ -16,19 +16,11 @@ import { processGenerationJob, verifyQStashSignature, getWorkerHealth } from '..
 const logger = createLogger({ route: '/api/worker/generate' });
 
 /**
- * Parse and validate the request body
+ * Parse and validate the request body from text
  */
-async function parseRequest(request: Request): Promise<GenerationJob | null> {
-  const contentType = request.headers.get('content-type');
-
-  if (contentType !== 'application/json') {
-    logger.warn({ contentType }, 'Invalid content type');
-    return null;
-  }
-
+function parseRequestBody(bodyText: string): GenerationJob | null {
   try {
-    const body = await request.text();
-    const payload = JSON.parse(body);
+    const payload = JSON.parse(bodyText);
     const job = validateGenerationJob(payload);
 
     if (!job) {
@@ -56,9 +48,19 @@ function verifySignature(request: Request, body: string): boolean {
  */
 export async function POST(request: Request): Promise<Response> {
   try {
-    // Parse request body
+    // Check content type
+    const contentType = request.headers.get('content-type');
+    if (contentType !== 'application/json') {
+      logger.warn({ contentType }, 'Invalid content type');
+      return new Response(
+        JSON.stringify({ error: 'Invalid content type' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse request body (read once)
     const body = await request.text();
-    const job = await parseRequest(request);
+    const job = parseRequestBody(body);
 
     if (!job) {
       return new Response(
@@ -67,13 +69,21 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    // Verify signature
-    if (!verifySignature(request, body)) {
+    // Skip signature verification in local development mode
+    const isLocalDev = request.headers.get('X-Local-Dev') === 'true';
+    const skipSignature = config.NODE_ENV === 'development' && isLocalDev;
+
+    // Verify signature (skip in local dev mode)
+    if (!skipSignature && !verifySignature(request, body)) {
       logger.warn({ jobId: job.jobId }, 'Invalid QStash signature');
       return new Response(
         JSON.stringify({ error: 'Invalid signature' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (skipSignature) {
+      logger.info({ jobId: job.jobId }, 'Processing job in local development mode (signature verification skipped)');
     }
 
     // Process the job

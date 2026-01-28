@@ -71,7 +71,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setErrors({ general: data.error || "Authentication failed" });
+        // Handle both string errors and {code, message} object errors
+        const errorMessage = typeof data.error === 'string'
+          ? data.error
+          : data.error?.message || "Authentication failed";
+        setErrors({ general: errorMessage });
         return;
       }
 

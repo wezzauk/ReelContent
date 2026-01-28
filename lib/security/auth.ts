@@ -61,3 +61,30 @@ export async function getUserFromHeader(
   const token = authHeader.slice(7);
   return verifyToken(token);
 }
+
+/**
+ * Get user from request - checks both Authorization header and cookie
+ * For use in API routes
+ */
+export async function getUserFromRequest(
+  headers: Headers
+): Promise<UserPayload | null> {
+  // First try Authorization header
+  const authHeader = headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const user = await getUserFromHeader(authHeader);
+    if (user) return user;
+  }
+
+  // Fall back to cookie (from Cookie header)
+  const cookieHeader = headers.get('Cookie') || '';
+  const authCookie = cookieHeader
+    .split(';')
+    .find((c) => c.trim().startsWith('auth_token='));
+  if (authCookie) {
+    const token = authCookie.split('=')[1].trim();
+    return verifyToken(token);
+  }
+
+  return null;
+}

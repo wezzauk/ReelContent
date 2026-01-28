@@ -37,22 +37,65 @@ export async function enqueueGenerationJob(
   const qstashUrl = config.QSTASH_URL;
   const token = config.QSTASH_TOKEN;
 
+  // Local development mode: process immediately without QStash
+  if (config.NODE_ENV === 'development' && config.APP_URL.includes('localhost')) {
+    console.log('[Queue] Local development mode: processing job immediately (bypassing QStash)');
+    
+    // Process the job immediately by calling the worker endpoint directly
+    try {
+      const workerUrl = `${config.APP_URL}/api/worker/generate`;
+      const response = await fetch(workerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Local-Dev': 'true', // Flag to skip signature verification
+        },
+        body: JSON.stringify(job),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Local worker failed: ${response.status} - ${error}`);
+      }
+
+      // Record job enqueued for latency tracking
+      recordJobEnqueued(job);
+
+      // Return a mock message ID
+      return `local-${job.jobId}`;
+    } catch (error) {
+      throw new Error(`Failed to process job locally: ${error}`);
+    }
+  }
+
   if (!qstashUrl || !token) {
     throw new Error('QStash configuration is missing');
   }
 
-  // Build QStash API URL - publish to the worker endpoint
+  // Build QStash API URL - v2 uses body field for destination
   const workerUrl = `${config.APP_URL}/api/worker/generate`;
-  const url = `${qstashUrl}/v2/publish/${encodeURIComponent(workerUrl)}`;
+  const callbackUrl = options?.callback ?? `${config.APP_URL}/api/worker/callback`;
+  const publishUrl = `${qstashUrl}/v2/publish`;
 
-  // Build request body
-  const body = JSON.stringify(job);
+  // Validate that APP_URL is publicly accessible (not localhost in production)
+  if (config.NODE_ENV !== 'development' && config.APP_URL.includes('localhost')) {
+    throw new Error(
+      'APP_URL must be a publicly accessible URL (not localhost) for QStash to work. ' +
+      'Please set APP_URL to your deployed application URL.'
+    );
+  }
+
+  // Build request body - v2 expects url as a field
+  const requestBody = {
+    url: workerUrl,
+    body: JSON.stringify(job),
+    callback: callbackUrl,
+  };
 
   // Build headers
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'Upstash-Callback': options?.callback ?? `${config.APP_URL}/api/worker/callback`,
   };
 
   // Add retry header if specified
@@ -73,10 +116,10 @@ export async function enqueueGenerationJob(
   }
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(publishUrl, {
       method: 'POST',
       headers,
-      body,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

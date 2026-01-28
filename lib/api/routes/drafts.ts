@@ -5,7 +5,7 @@
  */
 
 import { ApiError, ERROR_CODES } from '../../security/errors';
-import { getUserFromHeader } from '../../security/auth';
+import { getUserFromRequest } from '../../security/auth';
 import { validatePath, validateBody } from '../../security/validation';
 import {
   getDraftSchema,
@@ -13,7 +13,7 @@ import {
   type GetDraftRequest,
   type UpdateDraftRequest,
 } from '../schemas/requests';
-import { draftRepo } from '../../db/repositories';
+import { draftRepo, generationRepo, variantRepo } from '../../db/repositories';
 import { logger } from '../../observability/logger';
 import { getRequestId } from '../../observability/request-id';
 
@@ -26,7 +26,7 @@ export async function handleGetDraft(request: Request, params: Record<string, st
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
@@ -46,7 +46,25 @@ export async function handleGetDraft(request: Request, params: Record<string, st
       throw new ApiError(ERROR_CODES.FORBIDDEN, 'Not authorized', 403);
     }
 
-    // 5. Return draft
+    // 5. Fetch latest generation for this draft (if exists)
+    const generations = await generationRepo.findByDraftId(id);
+    const latestGeneration = generations.length > 0 ? generations[0] : null;
+
+    // 6. Fetch variants if generation is completed
+    let variants: Array<{
+      id: string;
+      variantIndex: number;
+      content: string;
+      videoUrl: string | null;
+      thumbnailUrl: string | null;
+      createdAt: Date;
+    }> = [];
+
+    if (latestGeneration && (latestGeneration.status === 'completed' || latestGeneration.status === 'processing')) {
+      variants = await variantRepo.findByGenerationId(latestGeneration.id);
+    }
+
+    // 7. Return draft with generation data
     return Response.json({
       success: true,
       data: {
@@ -59,6 +77,28 @@ export async function handleGetDraft(request: Request, params: Record<string, st
         isArchived: draft.isArchived,
         createdAt: draft.createdAt.toISOString(),
         updatedAt: draft.updatedAt.toISOString(),
+        // Include latest generation if exists
+        generation: latestGeneration ? {
+          id: latestGeneration.id,
+          status: latestGeneration.status,
+          errorMessage: latestGeneration.errorMessage,
+          isRegen: latestGeneration.isRegen,
+          variants: variants.map((v) => ({
+            id: v.id,
+            variantIndex: v.variantIndex,
+            content: v.content,
+            videoUrl: v.videoUrl,
+            thumbnailUrl: v.thumbnailUrl,
+            createdAt: v.createdAt.toISOString(),
+          })),
+          createdAt: latestGeneration.createdAt.toISOString(),
+          updatedAt: latestGeneration.updatedAt.toISOString(),
+          completedAt: latestGeneration.completedAt?.toISOString() ?? null,
+          polling: (latestGeneration.status === 'pending' || latestGeneration.status === 'processing') ? {
+            suggestedIntervalMs: 2000,
+            estimatedWaitMs: 30000,
+          } : undefined,
+        } : null,
       },
     }, {
       headers: { 'X-Request-ID': requestId },
@@ -90,7 +130,7 @@ export async function handleUpdateDraft(request: Request, params: Record<string,
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }

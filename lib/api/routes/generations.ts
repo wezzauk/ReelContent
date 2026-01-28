@@ -5,7 +5,7 @@
  */
 
 import { ApiError, ERROR_CODES } from '../../security/errors';
-import { getUserFromHeader } from '../../security/auth';
+import { getUserFromRequest } from '../../security/auth';
 import { validatePath } from '../../security/validation';
 import {
   getGenerationSchema,
@@ -24,7 +24,7 @@ export async function handleGetGeneration(request: Request, params: Record<strin
 
   try {
     // 1. Authenticate
-    const user = await getUserFromHeader(request.headers.get('authorization'));
+    const user = await getUserFromRequest(request.headers);
     if (!user) {
       throw new ApiError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }

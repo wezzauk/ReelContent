@@ -57,15 +57,6 @@ export default function CreatePage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const getAuthToken = (): string | null => {
-    if (typeof document === "undefined") return null;
-    const token = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith("auth_token="))
-      ?.split("=")[1];
-    return token || null;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -75,19 +66,12 @@ export default function CreatePage() {
     setErrors({});
 
     try {
-      const token = getAuthToken();
-      if (!token) {
-        setErrors({ general: "Please sign in to create content" });
-        router.push("/login");
-        return;
-      }
-
       const response = await fetch("/api/v1/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include", // Send httpOnly cookies automatically
         body: JSON.stringify({
           prompt: formData.prompt.trim(),
           platform: formData.platform,
@@ -95,6 +79,12 @@ export default function CreatePage() {
           variantCount: formData.variantCount,
         }),
       });
+
+      // Handle unauthorized - redirect to login
+      if (response.status === 401) {
+        router.push("/login");
+        return;
+      }
 
       const data = await response.json();
 

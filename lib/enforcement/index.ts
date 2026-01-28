@@ -66,7 +66,7 @@ export async function enforceMonthlyPool(
   limit: number,
   increment: number = 1
 ): Promise<EnforcementResult> {
-  const script = getScript(LuaScripts.COUNTER_WITH_LIMIT);
+  const script = await getScript(LuaScripts.COUNTER_WITH_LIMIT);
   if (!script) {
     throw new Error('counter_with_limit script not loaded');
   }
@@ -108,7 +108,7 @@ export async function enforceHourlyBurst(
   limit: number = DEFAULT_BURST_LIMIT,
   increment: number = 1
 ): Promise<EnforcementResult> {
-  const script = getScript(LuaScripts.COUNTER_WITH_LIMIT);
+  const script = await getScript(LuaScripts.COUNTER_WITH_LIMIT);
   if (!script) {
     throw new Error('counter_with_limit script not loaded');
   }
@@ -149,7 +149,7 @@ export async function enforceFullRegenCap(
   userId: string,
   limit: number
 ): Promise<EnforcementResult> {
-  const script = getScript(LuaScripts.COUNTER_WITH_LIMIT);
+  const script = await getScript(LuaScripts.COUNTER_WITH_LIMIT);
   if (!script) {
     throw new Error('counter_with_limit script not loaded');
   }
@@ -191,7 +191,7 @@ export async function acquireUserConcurrency(
   generationId: string,
   maxLeases: number
 ): Promise<SemaphoreResult> {
-  const script = getScript(LuaScripts.SEMAPHORE_ACQUIRE);
+  const script = await getScript(LuaScripts.SEMAPHORE_ACQUIRE);
   if (!script) {
     throw new Error('semaphore_acquire script not loaded');
   }
@@ -240,7 +240,7 @@ export async function releaseUserConcurrency(
   userId: string,
   leaseId: string
 ): Promise<SemaphoreResult> {
-  const script = getScript(LuaScripts.SEMAPHORE_RELEASE);
+  const script = await getScript(LuaScripts.SEMAPHORE_RELEASE);
   if (!script) {
     throw new Error('semaphore_release script not loaded');
   }
@@ -282,7 +282,7 @@ export async function acquireProviderConcurrency(
   leaseId: string,
   maxLeases: number
 ): Promise<SemaphoreResult> {
-  const script = getScript(LuaScripts.SEMAPHORE_ACQUIRE);
+  const script = await getScript(LuaScripts.SEMAPHORE_ACQUIRE);
   if (!script) {
     throw new Error('semaphore_acquire script not loaded');
   }
@@ -324,7 +324,7 @@ export async function releaseProviderConcurrency(
   lane: string,
   leaseId: string
 ): Promise<SemaphoreResult> {
-  const script = getScript(LuaScripts.SEMAPHORE_RELEASE);
+  const script = await getScript(LuaScripts.SEMAPHORE_RELEASE);
   if (!script) {
     throw new Error('semaphore_release script not loaded');
   }
@@ -360,7 +360,7 @@ export async function checkAndSetRegenCooldown(
   userId: string,
   draftId: string
 ): Promise<{ allowed: boolean; ttlRemaining: number }> {
-  const script = getScript(LuaScripts.CHECK_AND_SET_COOLDOWN);
+  const script = await getScript(LuaScripts.CHECK_AND_SET_COOLDOWN);
   if (!script) {
     throw new Error('check_and_set_cooldown script not loaded');
   }
@@ -400,7 +400,7 @@ export async function getOrSetIdempotency<T>(
   userId: string,
   value: T
 ): Promise<IdempotencyResult<T>> {
-  const script = getScript(LuaScripts.IDEMPOTENCY_GET_SET);
+  const script = await getScript(LuaScripts.IDEMPOTENCY_GET_SET);
   if (!script) {
     throw new Error('idempotency_get_set script not loaded');
   }
