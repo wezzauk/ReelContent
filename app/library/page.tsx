@@ -23,7 +23,10 @@ interface AssetsResponse {
 }
 
 const fetcher = async (url: string): Promise<AssetsResponse> => {
-  const res = await fetch(url);
+  const token = getAuthToken();
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error?.message || "Failed to fetch");

@@ -437,6 +437,8 @@ function ReviewContent() {
 
       setSaveModalOpen(false);
       setSelectedVariant(null);
+      // Show success feedback
+      alert("Saved to library!");
     } catch {
       setSaveError("Network error. Please try again.");
     } finally {
