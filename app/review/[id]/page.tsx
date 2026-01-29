@@ -218,9 +218,10 @@ interface SaveToLibraryModalProps {
   onSave: (title: string, tags: string[]) => Promise<void>;
   isLoading: boolean;
   variantContent: string;
+  error?: string | null;
 }
 
-function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent }: SaveToLibraryModalProps) {
+function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent, error }: SaveToLibraryModalProps) {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
 
@@ -282,6 +283,13 @@ function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent
             />
           </div>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            {error}
+          </div>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <button
@@ -622,10 +630,14 @@ function ReviewContent() {
 
         <SaveToLibraryModal
           isOpen={saveModalOpen}
-          onClose={() => setSaveModalOpen(false)}
+          onClose={() => {
+            setSaveModalOpen(false);
+            setSaveError(null);
+          }}
           onSave={handleSaveToLibrary}
           isLoading={isSaving}
           variantContent={selectedVariant?.content || ""}
+          error={saveError}
         />
       </div>
     );
