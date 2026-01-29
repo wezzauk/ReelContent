@@ -113,6 +113,27 @@ async function createMessage(args: { model: string; prompt: string; maxTokens: n
 // -----------------------------
 
 function buildPrompt(req: GenerateContentRequest): string {
+  // Build persona guidance section if persona fields are present
+  const personaSections: string[] = [];
+  if (req.calibration.personaName) {
+    personaSections.push(`Persona Name: ${req.calibration.personaName}`);
+  }
+  if (req.calibration.personaBio) {
+    personaSections.push(`Persona Bio: ${req.calibration.personaBio}`);
+  }
+  if (req.calibration.personaVoice) {
+    personaSections.push(`Voice Style: ${req.calibration.personaVoice}`);
+  }
+  if (req.calibration.personaDoPhrases?.length) {
+    personaSections.push(`USE phrases like: ${req.calibration.personaDoPhrases.join(", ")}`);
+  }
+  if (req.calibration.personaDontPhrases?.length) {
+    personaSections.push(`AVOID phrases like: ${req.calibration.personaDontPhrases.join(", ")}`);
+  }
+  if (req.calibration.personaContentPillars?.length) {
+    personaSections.push(`Content Pillars: ${req.calibration.personaContentPillars.join(", ")}`);
+  }
+
   const lines = [
     "You are Reel Content, an expert short-form social content creator.",
     "Return ONLY valid JSON. No markdown. No commentary.",
@@ -125,6 +146,10 @@ function buildPrompt(req: GenerateContentRequest): string {
     req.calibration.goals?.length ? `Goals: ${req.calibration.goals.join(", ")}` : "",
     `Topic: ${req.input.topic}`,
     req.input.notes ? `Notes: ${req.input.notes}` : "",
+    "",
+    // Persona guidance section
+    personaSections.length ? "=== PERSONA GUIDANCE ===" : "",
+    personaSections.length ? personaSections.join("\n") : "",
     "",
     "Output JSON schema:",
     `{"variants":[{"text":"...","hashtags":["..."],"metadata":{"hook":"...","benefit":"...","cta":"..."}}]}`,

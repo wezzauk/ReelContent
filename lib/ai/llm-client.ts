@@ -42,6 +42,14 @@ export interface Calibration {
   audience?: string;
   tone?: string;
   goals?: string[];
+  // Persona fields - optional guidance for content generation
+  personaId?: string;
+  personaName?: string;
+  personaBio?: string;
+  personaVoice?: string;
+  personaDoPhrases?: string[];
+  personaDontPhrases?: string[];
+  personaContentPillars?: string[];
 }
 
 export interface GenerateContentRequest {

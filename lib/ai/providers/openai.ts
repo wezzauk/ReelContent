@@ -165,6 +165,27 @@ function buildMessages(req: GenerateContentRequest): Array<{ role: "system" | "u
     "Do not include any extra keys.",
   ].join(" ");
 
+  // Build persona guidance section if persona fields are present
+  const personaSections: string[] = [];
+  if (req.calibration.personaName) {
+    personaSections.push(`Persona Name: ${req.calibration.personaName}`);
+  }
+  if (req.calibration.personaBio) {
+    personaSections.push(`Persona Bio: ${req.calibration.personaBio}`);
+  }
+  if (req.calibration.personaVoice) {
+    personaSections.push(`Voice Style: ${req.calibration.personaVoice}`);
+  }
+  if (req.calibration.personaDoPhrases?.length) {
+    personaSections.push(`USE phrases like: ${req.calibration.personaDoPhrases.join(", ")}`);
+  }
+  if (req.calibration.personaDontPhrases?.length) {
+    personaSections.push(`AVOID phrases like: ${req.calibration.personaDontPhrases.join(", ")}`);
+  }
+  if (req.calibration.personaContentPillars?.length) {
+    personaSections.push(`Content Pillars: ${req.calibration.personaContentPillars.join(", ")}`);
+  }
+
   const user = [
     `Platform: ${req.platform}`,
     `Action: ${req.actionType}`,
@@ -174,6 +195,10 @@ function buildMessages(req: GenerateContentRequest): Array<{ role: "system" | "u
     req.calibration.goals?.length ? `Goals: ${req.calibration.goals.join(", ")}` : "",
     `Topic: ${req.input.topic}`,
     req.input.notes ? `Notes: ${req.input.notes}` : "",
+    "",
+    // Persona guidance section
+    personaSections.length ? "=== PERSONA GUIDANCE ===" : "",
+    personaSections.length ? personaSections.join("\n") : "",
     "",
     "Structure each variant as:",
     "1) Hook",
