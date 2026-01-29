@@ -335,6 +335,33 @@ export const usageRollups = pgTable(
 );
 
 /**
+ * Persona table - stores user voice/persona settings
+ * Supports multiple personas per user with one default
+ */
+export const personas = pgTable(
+  'personas',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(), // e.g., "Weslyn"
+    bio: text('bio'), // e.g., "29-31, NYC, quietly ambitious"
+    voiceDescription: text('voice_description'), // e.g., "Calm, clear, conversational"
+    doPhrases: text('do_phrases').array().default([]),
+    dontPhrases: text('dont_phrases').array().default([]),
+    contentPillars: text('content_pillars').array().default([]),
+    isDefault: boolean('is_default').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => [
+    index('personas_user_id_idx').on(table.userId),
+    index('personas_default_idx').on(table.userId, table.isDefault),
+  ]
+);
+
+/**
  * Define relationships for the schema
  */
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -347,6 +374,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   generations: many(generations),
   assets: many(assets),
   usageLedger: many(usageLedger),
+  personas: many(personas),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -438,6 +466,13 @@ export const usageRollupsRelations = relations(usageRollups, ({ one }) => ({
   }),
 }));
 
+export const personasRelations = relations(personas, ({ one }) => ({
+  user: one(users, {
+    fields: [personas.userId],
+    references: [users.id],
+  }),
+}));
+
 // Type exports for convenience
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -457,3 +492,5 @@ export type UsageLedger = typeof usageLedger.$inferSelect;
 export type NewUsageLedger = typeof usageLedger.$inferInsert;
 export type UsageRollup = typeof usageRollups.$inferSelect;
 export type NewUsageRollup = typeof usageRollups.$inferInsert;
+export type Persona = typeof personas.$inferSelect;
+export type NewPersona = typeof personas.$inferInsert;
