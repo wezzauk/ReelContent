@@ -63,7 +63,7 @@ export async function getUserFromHeader(
 }
 
 /**
- * Get user from request - checks both Authorization header and cookie
+ * Get user from request - checks Authorization header, cookie, or X-User-Id header (set by middleware)
  * For use in API routes
  */
 export async function getUserFromRequest(
@@ -84,6 +84,13 @@ export async function getUserFromRequest(
   if (authCookie) {
     const token = authCookie.split('=')[1].trim();
     return verifyToken(token);
+  }
+
+  // Finally, check X-User-Id header set by middleware (for cross-request auth)
+  const userId = headers.get('X-User-Id');
+  const userPlan = headers.get('X-User-Plan') || 'basic';
+  if (userId) {
+    return { userId, email: '', plan: userPlan as UserPayload['plan'] };
   }
 
   return null;

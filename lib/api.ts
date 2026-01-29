@@ -15,11 +15,15 @@ export type DashboardDTO = {
 
 export const api = {
   getDashboard: async (): Promise<DashboardDTO> => {
-    const [jobs, exports, usage] = await Promise.all([
-      apiGet<Job[]>(`/api/jobs?limit=3&status=processing,needs_review`),
-      apiGet<ExportItem[]>(`/api/exports?limit=3`),
+    const [jobsRes, exportsRes, usageRes] = await Promise.all([
+      apiGet<{ jobs: Job[] }>(`/api/jobs?limit=3&status=processing,needs_review`),
+      apiGet<{ exports: ExportItem[] }>(`/api/exports?limit=3`),
       apiGet<Usage>(`/api/usage`),
     ]);
-    return { jobs, exports, usage };
+    return {
+      jobs: jobsRes.jobs,
+      exports: exportsRes.exports,
+      usage: usageRes,
+    };
   },
 };

@@ -145,11 +145,10 @@ export async function authGuard(
     }
 
     // Attach user to request headers for downstream use
-    const response = NextResponse.next();
-    response.headers.set('X-User-Id', user.userId);
-    response.headers.set('X-User-Plan', user.plan);
+    request.headers.set('X-User-Id', user.userId);
+    request.headers.set('X-User-Plan', user.plan);
 
-    return response;
+    return NextResponse.next();
   }
 
   // Dashboard routes also require authentication
@@ -162,11 +161,11 @@ export async function authGuard(
       return applySecurityHeaders(response);
     }
 
-    const response = NextResponse.next();
-    response.headers.set('X-User-Id', user.userId);
-    response.headers.set('X-User-Plan', user.plan);
+    // Attach user to request headers for downstream use
+    request.headers.set('X-User-Id', user.userId);
+    request.headers.set('X-User-Plan', user.plan);
 
-    return response;
+    return NextResponse.next();
   }
 
   return null;
@@ -185,11 +184,8 @@ export async function handleRequest(request: NextRequest): Promise<NextResponse>
       return securityResponse;
     }
 
-    // Check auth for protected routes (write endpoints)
-    const isWriteMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(
-      request.method
-    );
-    if (isWriteMethod) {
+    // Check auth for all API routes (both read and write)
+    if (request.nextUrl.pathname.startsWith('/api/')) {
       const authResponse = await authGuard(request);
       if (authResponse) {
         return authResponse;

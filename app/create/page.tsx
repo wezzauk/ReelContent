@@ -1,14 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+
+interface Persona {
+  id: string;
+  name: string;
+  bio: string | null;
+  voiceDescription: string | null;
+  doPhrases: string[];
+  dontPhrases: string[];
+  contentPillars: string[];
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PersonaResponse {
+  success: boolean;
+  data: Persona[];
+  defaultId: string | null;
+  hasPersonas: boolean;
+}
 
 interface FormData {
   prompt: string;
   platform: "tiktok" | "youtube_shorts" | "instagram_reels";
   title: string;
   variantCount: number;
+  personaId: string | null;
 }
 
 interface FormErrors {
@@ -22,13 +43,40 @@ interface FormErrors {
 export default function CreatePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [defaultPersonaId, setDefaultPersonaId] = useState<string | null>(null);
+  const [personasLoading, setPersonasLoading] = useState(true);
   const [formData, setFormData] = useState<FormData>({
     prompt: "",
     platform: "tiktok",
     title: "",
     variantCount: 1,
+    personaId: null,
   });
   const [errors, setErrors] = useState<FormErrors>({});
+
+  useEffect(() => {
+    fetchPersonas();
+  }, []);
+
+  const fetchPersonas = async () => {
+    try {
+      const response = await fetch("/api/v1/persona");
+      const data: PersonaResponse = await response.json();
+      if (data.success) {
+        setPersonas(data.data);
+        setDefaultPersonaId(data.defaultId);
+        // Auto-select default persona
+        if (data.defaultId) {
+          setFormData((prev) => ({ ...prev, personaId: data.defaultId }));
+        }
+      }
+    } catch {
+      // Silently fail - personas are optional
+    } finally {
+      setPersonasLoading(false);
+    }
+  };
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -77,6 +125,7 @@ export default function CreatePage() {
           platform: formData.platform,
           title: formData.title.trim() || undefined,
           variantCount: formData.variantCount,
+          personaId: formData.personaId || undefined,
         }),
       });
 
@@ -183,6 +232,68 @@ export default function CreatePage() {
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">
                   {errors.platform}
                 </p>
+              )}
+            </div>
+
+            {/* Persona Selection */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Voice / Persona
+                </label>
+                {personasLoading ? (
+                  <span className="text-xs text-zinc-400">Loading...</span>
+                ) : personas.length === 0 ? (
+                  <a
+                    href="/onboarding/persona"
+                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    Setup persona
+                  </a>
+                ) : (
+                  <a
+                    href="/settings/persona"
+                    className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    Manage personas
+                  </a>
+                )}
+              </div>
+              {personasLoading ? (
+                <div className="mt-2 h-10 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+              ) : personas.length === 0 ? (
+                <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-center dark:border-zinc-700 dark:bg-zinc-900/50">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No personas configured. Content will use default settings.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2">
+                  <select
+                    value={formData.personaId || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        personaId: e.target.value || null,
+                      }))
+                    }
+                    className="block w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                  >
+                    <option value="">Default settings</option>
+                    {personas.map((persona) => (
+                      <option key={persona.id} value={persona.id}>
+                        {persona.name}
+                        {persona.isDefault ? " (Default)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {formData.personaId && (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {personas.find((p) => p.id === formData.personaId)?.bio ||
+                        "Using custom voice settings"}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
