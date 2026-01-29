@@ -273,3 +273,88 @@ export const assetResponseSchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
+
+// ============================================================================
+// Persona Schemas
+// ============================================================================
+
+// Persona templates (for onboarding)
+export const WESLYN_TEMPLATE = {
+  name: "Weslyn",
+  bio: "29-31, NYC, quietly ambitious",
+  voiceDescription: "Calm, clear, conversational, non-salesy, everyday smart",
+  doPhrases: [
+    "What worked for me...",
+    "This might help...",
+    "Here's how I think about it...",
+    "You don't need anything complicated.",
+  ],
+  dontPhrases: [
+    "This will change your life",
+    "Six figures fast",
+    "Secret method",
+    "You must do this",
+  ],
+  contentPillars: [
+    "Make Money (Simple & Honest)",
+    "Productivity (Low Pressure)",
+    "Everyday Life",
+    "Explainers",
+    "Soft Authority",
+  ],
+} as const;
+
+export const personaInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  bio: z.string().max(500).optional(),
+  voiceDescription: z.string().max(1000).optional(),
+  doPhrases: z.array(z.string().min(1).max(200)).default([]),
+  dontPhrases: z.array(z.string().min(1).max(200)).default([]),
+  contentPillars: z.array(z.string().min(1).max(100)).default([]),
+});
+
+export type PersonaInput = z.infer<typeof personaInputSchema>;
+
+export const setupPersonaSchema = z.object({
+  templateId: z.enum(["weslyn", "custom"]).default("custom"),
+  // If custom: include persona fields
+  name: z.string().min(1).max(100).optional(),
+  bio: z.string().max(500).optional(),
+  voiceDescription: z.string().max(1000).optional(),
+  doPhrases: z.array(z.string().min(1).max(200)).min(1).max(10).optional(),
+  dontPhrases: z.array(z.string().min(1).max(200)).max(10).optional(),
+  contentPillars: z.array(z.string().min(1).max(100)).min(1).max(5).optional(),
+});
+
+export type SetupPersonaRequest = z.infer<typeof setupPersonaSchema>;
+
+export const updatePersonaSchema = z.object({
+  id: z.string().uuid(),
+  data: personaInputSchema,
+});
+
+export type UpdatePersonaRequest = z.infer<typeof updatePersonaSchema>;
+
+export const setDefaultSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export type SetDefaultRequest = z.infer<typeof setDefaultSchema>;
+
+/**
+ * Persona response
+ */
+export const personaResponseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  bio: z.string().nullable(),
+  voiceDescription: z.string().nullable(),
+  doPhrases: z.array(z.string()),
+  dontPhrases: z.array(z.string()),
+  contentPillars: z.array(z.string()),
+  isDefault: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type PersonaResponse = z.infer<typeof personaResponseSchema>;

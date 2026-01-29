@@ -13,6 +13,7 @@ import {
   variants,
   assets,
   usageLedger,
+  personas,
   type User,
   type NewUser,
   type Subscription,
@@ -29,6 +30,8 @@ import {
   type NewAsset,
   type UsageLedger,
   type NewUsageLedger,
+  type Persona,
+  type NewPersona,
   GENERATION_STATUS,
   ASSET_STATUS,
   PLAN_TYPE,
@@ -574,6 +577,76 @@ export class UsageLedgerRepository {
   }
 }
 
+/**
+ * Persona Repository
+ */
+export class PersonaRepository {
+  private db = getDb();
+
+  async create(data: NewPersona): Promise<Persona> {
+    const [persona] = await this.db.insert(personas).values(data).returning();
+    return persona;
+  }
+
+  async findById(id: string): Promise<Persona | null> {
+    const [persona] = await this.db.select().from(personas).where(eq(personas.id, id));
+    return persona || null;
+  }
+
+  async findByUserId(userId: string): Promise<Persona | null> {
+    const [persona] = await this.db
+      .select()
+      .from(personas)
+      .where(eq(personas.userId, userId))
+      .orderBy(desc(personas.isDefault), desc(personas.createdAt))
+      .limit(1);
+    return persona || null;
+  }
+
+  async findAllByUserId(userId: string): Promise<Persona[]> {
+    return this.db
+      .select()
+      .from(personas)
+      .where(eq(personas.userId, userId))
+      .orderBy(desc(personas.isDefault), desc(personas.createdAt));
+  }
+
+  async findDefault(userId: string): Promise<Persona | null> {
+    const [persona] = await this.db
+      .select()
+      .from(personas)
+      .where(and(eq(personas.userId, userId), eq(personas.isDefault, true)))
+      .limit(1);
+    return persona || null;
+  }
+
+  async update(id: string, data: Partial<NewPersona>): Promise<Persona | null> {
+    const [persona] = await this.db
+      .update(personas)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(personas.id, id))
+      .returning();
+    return persona || null;
+  }
+
+  async setDefault(userId: string, personaId: string): Promise<void> {
+    await this.db
+      .update(personas)
+      .set({ isDefault: false })
+      .where(and(eq(personas.userId, userId), eq(personas.isDefault, true)));
+
+    await this.db
+      .update(personas)
+      .set({ isDefault: true, updatedAt: new Date() })
+      .where(eq(personas.id, personaId));
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.db.delete(personas).where(eq(personas.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
 // Export singleton instances for convenience
 export const userRepo = new UserRepository();
 export const subscriptionRepo = new SubscriptionRepository();
@@ -583,6 +656,7 @@ export const generationRepo = new GenerationRepository();
 export const variantRepo = new VariantRepository();
 export const assetRepo = new AssetRepository();
 export const usageLedgerRepo = new UsageLedgerRepository();
+export const personaRepo = new PersonaRepository();
 
 // ============================================================================
 // Dashboard-specific query functions
