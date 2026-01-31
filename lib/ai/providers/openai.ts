@@ -56,7 +56,7 @@ const OpenAIJsonSchema = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["hook", "benefit", "body", "cta", "hashtags"],
+          required: ["hook", "benefit", "body", "cta", "hashtags", "aiDisclaimer", "nanobananaPrompt"],
           properties: {
             hook: { type: "string" },
             benefit: { type: "string" },
@@ -66,6 +66,8 @@ const OpenAIJsonSchema = {
               type: "array",
               items: { type: "string" },
             },
+            aiDisclaimer: { type: "string" },
+            nanobananaPrompt: { type: "string" },
           },
         },
       },
@@ -210,6 +212,13 @@ function buildMessages(req: GenerateContentRequest): Array<{ role: "system" | "u
     "- Provide platform-appropriate suggested hashtags as an array (not embedded in text).",
     "- Instagram: 5-10; TikTok: 3-5; Facebook: 0-3.",
     "",
+    "AI Disclaimer:",
+    "- Add a short disclaimer indicating this content was AI-generated (e.g., 'Made with AI' or similar).",
+    "",
+    "Nanobanana Prompt:",
+    "- Provide a detailed image generation prompt suitable for nanobanana pro based on the caption content.",
+    "- The prompt should describe the visual style, mood, and key elements for an engaging social media image.",
+    "",
     "Anti-repetition:",
     req.recentHooks?.length ? `Avoid hooks similar to: ${req.recentHooks.join(" | ")}` : "",
     req.recentCTAs?.length ? `Avoid CTAs similar to: ${req.recentCTAs.join(" | ")}` : "",
@@ -305,19 +314,19 @@ function extractFirstText(resp: any): string | null {
 
 /**
  * Transform OpenAI response format to our expected format
- * OpenAI returns: { hook, benefit, body, cta, hashtags }
- * We need: { text, hashtags, metadata: { hook, benefit, cta } }
+ * OpenAI returns: { hook, benefit, body, cta, hashtags, aiDisclaimer, nanobananaPrompt }
+ * We need: { text, hashtags, aiDisclaimer, nanobananaPrompt, metadata: { hook, benefit, cta } }
  */
 function transformOpenAIResponse(data: any): unknown {
   if (!data || typeof data !== 'object') return data;
-  
+
   // If it doesn't have variants, return as-is
   if (!data.variants || !Array.isArray(data.variants)) return data;
 
   return {
     variants: data.variants.map((v: any) => {
       // If already in correct format, return as-is
-      if (v.text && v.metadata) return v;
+      if (v.text && v.metadata && v.aiDisclaimer && v.nanobananaPrompt) return v;
 
       // Transform from OpenAI format to our format
       // Combine hook, benefit, body, and cta into the text field
@@ -328,6 +337,8 @@ function transformOpenAIResponse(data: any): unknown {
       return {
         text,
         hashtags: v.hashtags || [],
+        aiDisclaimer: v.aiDisclaimer || '',
+        nanobananaPrompt: v.nanobananaPrompt || '',
         metadata: {
           hook: v.hook || '',
           benefit: v.benefit || '',

@@ -58,6 +58,7 @@ export async function handleGetDraft(request: Request, params: Record<string, st
       videoUrl: string | null;
       thumbnailUrl: string | null;
       createdAt: Date;
+      metadata: string | null;
     }> = [];
 
     if (latestGeneration && (latestGeneration.status === 'completed' || latestGeneration.status === 'processing')) {
@@ -83,14 +84,26 @@ export async function handleGetDraft(request: Request, params: Record<string, st
           status: latestGeneration.status,
           errorMessage: latestGeneration.errorMessage,
           isRegen: latestGeneration.isRegen,
-          variants: variants.map((v) => ({
-            id: v.id,
-            variantIndex: v.variantIndex,
-            content: v.content,
-            videoUrl: v.videoUrl,
-            thumbnailUrl: v.thumbnailUrl,
-            createdAt: v.createdAt.toISOString(),
-          })),
+          variants: variants.map((v) => {
+            // Parse metadata for new fields
+            let metadata: { hashtags?: string[]; aiDisclaimer?: string; nanobananaPrompt?: string } = {};
+            try {
+              metadata = JSON.parse(v.metadata ?? '{}');
+            } catch {
+              // Ignore parse errors
+            }
+            return {
+              id: v.id,
+              variantIndex: v.variantIndex,
+              content: v.content,
+              videoUrl: v.videoUrl,
+              thumbnailUrl: v.thumbnailUrl,
+              hashtags: metadata.hashtags ?? [],
+              aiDisclaimer: metadata.aiDisclaimer ?? '',
+              nanobananaPrompt: metadata.nanobananaPrompt ?? '',
+              createdAt: v.createdAt.toISOString(),
+            };
+          }),
           createdAt: latestGeneration.createdAt.toISOString(),
           updatedAt: latestGeneration.updatedAt.toISOString(),
           completedAt: latestGeneration.completedAt?.toISOString() ?? null,

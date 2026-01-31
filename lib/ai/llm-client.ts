@@ -78,6 +78,8 @@ export interface GenerateContentRequest {
 export interface ContentVariant {
   text: string;
   hashtags: string[];
+  aiDisclaimer: string;
+  nanobananaPrompt: string;
   metadata: {
     hook: string;
     benefit: string;
@@ -104,6 +106,8 @@ export interface GenerationResult {
 export const ContentVariantSchema = z.object({
   text: z.string().min(1),
   hashtags: z.array(z.string().min(1)).default([]),
+  aiDisclaimer: z.string().min(1),
+  nanobananaPrompt: z.string().min(1),
   metadata: z.object({
     hook: z.string().min(1),
     benefit: z.string().min(1),
@@ -195,6 +199,8 @@ export async function generateContent(
   const variants: ContentVariant[] = parsed.variants.map((v) => ({
     text: v.text,
     hashtags: v.hashtags,
+    aiDisclaimer: v.aiDisclaimer,
+    nanobananaPrompt: v.nanobananaPrompt,
     metadata: v.metadata,
   }));
 

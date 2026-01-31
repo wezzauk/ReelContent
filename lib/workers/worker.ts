@@ -78,7 +78,7 @@ export interface WorkerResult {
   success: boolean;
   jobId: string;
   generationId: string;
-  variants?: Array<{ id: string; content: string; index: number }>;
+  variants?: Array<{ id: string; content: string; index: number; hashtags: string[]; aiDisclaimer: string; nanobananaPrompt: string }>;
   error?: string;
   shouldRetry: boolean;
   retryAfter?: number;
@@ -283,6 +283,9 @@ export async function processGenerationJob(job: GenerationJob): Promise<WorkerRe
         id: v.id,
         content: v.content,
         index: v.variantIndex,
+        hashtags: v.hashtags,
+        aiDisclaimer: v.aiDisclaimer,
+        nanobananaPrompt: v.nanobananaPrompt,
       })),
       shouldRetry: false,
     };
@@ -367,7 +370,7 @@ async function callAIGenerator(params: {
   regenType?: string;
 }): Promise<{
   success: boolean;
-  variants?: string[];
+  variants?: Array<{ content: string; hashtags: string[]; aiDisclaimer: string; nanobananaPrompt: string }>;
   model?: string;
   promptTokens?: number;
   completionTokens?: number;
@@ -450,12 +453,17 @@ async function callAIGenerator(params: {
         };
       }
 
-      // Extract text content from variants
-      const variantTexts = result.variants.map((v) => v.text);
+      // Extract all variant data including new fields
+      const variantData = result.variants.map((v) => ({
+        content: v.text,
+        hashtags: v.hashtags,
+        aiDisclaimer: v.aiDisclaimer,
+        nanobananaPrompt: v.nanobananaPrompt,
+      }));
 
       return {
         success: true,
-        variants: variantTexts,
+        variants: variantData,
         model: result.model,
         promptTokens: result.usage?.inputTokens || 0,
         completionTokens: outputTokens,
@@ -484,25 +492,35 @@ async function saveVariants(params: {
   generationId: string;
   draftId: string;
   ownerId: string;
-  variants: string[];
-}): Promise<Array<{ id: string; content: string; variantIndex: number }>> {
+  variants: Array<{ content: string; hashtags: string[]; aiDisclaimer: string; nanobananaPrompt: string }>;
+}): Promise<Array<{ id: string; content: string; variantIndex: number; hashtags: string[]; aiDisclaimer: string; nanobananaPrompt: string }>> {
   const { generationId, draftId, ownerId, variants } = params;
 
-  const savedVariants: Array<{ id: string; content: string; variantIndex: number }> = [];
+  const savedVariants: Array<{ id: string; content: string; variantIndex: number; hashtags: string[]; aiDisclaimer: string; nanobananaPrompt: string }> = [];
 
   for (let i = 0; i < variants.length; i++) {
+    const variantData = variants[i];
+    const metadata = JSON.stringify({
+      hashtags: variantData.hashtags,
+      aiDisclaimer: variantData.aiDisclaimer,
+      nanobananaPrompt: variantData.nanobananaPrompt,
+    });
+
     const variant = await variantRepo.create({
       generationId,
       draftId,
       ownerId,
       variantIndex: i + 1,
-      content: variants[i],
-      metadata: '{}',
+      content: variantData.content,
+      metadata: metadata,
     });
     savedVariants.push({
       id: variant.id,
       content: variant.content,
       variantIndex: variant.variantIndex,
+      hashtags: variantData.hashtags,
+      aiDisclaimer: variantData.aiDisclaimer,
+      nanobananaPrompt: variantData.nanobananaPrompt,
     });
   }
 

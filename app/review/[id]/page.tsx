@@ -21,6 +21,9 @@ interface Variant {
   content: string;
   videoUrl: string | null;
   thumbnailUrl: string | null;
+  hashtags: string[];
+  aiDisclaimer: string;
+  nanobananaPrompt: string;
   createdAt: string;
 }
 
@@ -221,7 +224,7 @@ interface SaveToLibraryModalProps {
   error?: string | null;
 }
 
-function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent, error }: SaveToLibraryModalProps) {
+function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent, error, variantHashtags, variantAiDisclaimer }: SaveToLibraryModalProps & { variantHashtags?: string[]; variantAiDisclaimer?: string }) {
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
 
@@ -243,9 +246,19 @@ function SaveToLibraryModal({ isOpen, onClose, onSave, isLoading, variantContent
 
         {/* Preview */}
         <div className="mt-4 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-          <p className="line-clamp-3 text-sm text-zinc-600 dark:text-zinc-300">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap">
             {variantContent}
           </p>
+          {variantHashtags && variantHashtags.length > 0 && (
+            <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+              {variantHashtags.map(tag => `#${tag}`).join(' ')}
+            </p>
+          )}
+          {variantAiDisclaimer && (
+            <p className="mt-1 text-xs text-zinc-500 italic">
+              ({variantAiDisclaimer})
+            </p>
+          )}
         </div>
 
         <div className="mt-4 space-y-4">
@@ -374,16 +387,12 @@ function ReviewContent() {
 
     try {
       const token = getAuthToken();
-      if (!token) {
-        router.push("/login");
-        return;
-      }
 
       const response = await fetch("/api/v1/regenerate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           draftId,
@@ -392,6 +401,12 @@ function ReviewContent() {
           variantCount: 1,
         }),
       });
+
+      // Handle 401 - redirect to login
+      if (response.status === 401) {
+        router.push("/login");
+        return;
+      }
 
       const data = await response.json();
 
@@ -417,16 +432,12 @@ function ReviewContent() {
 
     try {
       const token = getAuthToken();
-      if (!token) {
-        router.push("/login");
-        return;
-      }
 
       const response = await fetch("/api/v1/library/assets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           draftId,
@@ -435,6 +446,12 @@ function ReviewContent() {
           tags,
         }),
       });
+
+      // Handle 401 - redirect to login
+      if (response.status === 401) {
+        router.push("/login");
+        return;
+      }
 
       const data = await response.json();
 
@@ -582,9 +599,33 @@ function ReviewContent() {
 
                   {/* Content */}
                   <div className="p-4">
-                    <p className="text-sm text-zinc-900 dark:text-zinc-100 line-clamp-4">
+                    <p className="text-sm text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
                       {variant.content}
                     </p>
+
+                    {/* Hashtags */}
+                    {variant.hashtags && variant.hashtags.length > 0 && (
+                      <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                        {variant.hashtags.map(tag => `#${tag}`).join(' ')}
+                      </p>
+                    )}
+
+                    {/* AI Disclaimer */}
+                    {variant.aiDisclaimer && (
+                      <p className="mt-2 text-xs text-zinc-500 italic">
+                        {variant.aiDisclaimer}
+                      </p>
+                    )}
+
+                    {/* Nanobanana Prompt */}
+                    {variant.nanobananaPrompt && (
+                      <div className="mt-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">NANOBANANA PRO PROMPT</p>
+                        <p className="mt-1 text-xs text-zinc-700 dark:text-zinc-300 break-words">
+                          {variant.nanobananaPrompt}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="mt-4 flex gap-2">
@@ -599,7 +640,13 @@ function ReviewContent() {
                       </button>
                       <button
                         onClick={() => {
-                          navigator.clipboard.writeText(variant.content);
+                          const fullContent = [
+                            variant.content,
+                            '',
+                            variant.hashtags.length > 0 ? variant.hashtags.map(t => `#${t}`).join(' ') : '',
+                            variant.aiDisclaimer ? `(${variant.aiDisclaimer})` : '',
+                          ].filter(Boolean).join('\n');
+                          navigator.clipboard.writeText(fullContent);
                         }}
                         className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
                       >
@@ -637,6 +684,8 @@ function ReviewContent() {
           onSave={handleSaveToLibrary}
           isLoading={isSaving}
           variantContent={selectedVariant?.content || ""}
+          variantHashtags={selectedVariant?.hashtags}
+          variantAiDisclaimer={selectedVariant?.aiDisclaimer}
           error={saveError}
         />
       </div>
